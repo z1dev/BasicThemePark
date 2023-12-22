@@ -1,0 +1,21 @@
+{
+	"settings": {
+		"typescript.tsc.autoDetect": "off",
+		"npm.autoDetect": "off",
+		"gulp.autoDetect": "off",
+		"jake.autoDetect": "off",
+		"grunt.autoDetect": "off",
+		"omnisharp.useModernNet": true,
+		"dotnet.defaultSolution": "BasicThemePark.sln"
+	},
+	"folders": [
+		{
+			"name": "BasicThemePark",
+			"path": "."
+		},
+		{
+			"name": "Flax",
+			"path": "G:\\Flax\\Flax_master"
+		}
+	]
+}

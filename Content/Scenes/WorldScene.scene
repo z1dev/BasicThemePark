@@ -1,0 +1,144 @@
+{
+	"ID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+	"TypeName": "FlaxEngine.SceneAsset",
+	"EngineBuild": 6407,
+	"Data": [
+		{
+			"ID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"TypeName": "FlaxEngine.Scene",
+			"LightmapSettings": {
+				"IndirectLightingIntensity": 1.0,
+				"GlobalObjectsScale": 1.0,
+				"ChartsPadding": 3,
+				"AtlasSize": 1024,
+				"BounceCount": 1,
+				"CompressLightmaps": true,
+				"UseGeometryWithNoMaterials": true,
+				"Quality": 10
+			}
+		},
+		{
+			"ID": "a6ada20e4d5dae961eb87b969dc8e846",
+			"TypeName": "Scripts.TileGenerator",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"V": {
+	"TextureSize": {
+		"X": 256,
+		"Y": 128
+	},
+	"TileSize": {
+		"X": 64,
+		"Y": 64
+	}
+}
+		},
+		{
+			"ID": "217161db447023c698218091d33fce75",
+			"TypeName": "FlaxEngine.DirectionalLight",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"Name": "Sun",
+			"Transform": {
+				"Translation": {
+					"X": 40.0,
+					"Y": 160.0,
+					"Z": 0.0
+				},
+				"Orientation": {
+					"X": 0.3826834559440613,
+					"Y": 0.0,
+					"Z": 0.0,
+					"W": 0.9238795042037964
+				}
+			},
+			"Brightness": 3.0
+		},
+		{
+			"ID": "5ee5628d425378acacb2dc8efe78aa33",
+			"TypeName": "FlaxEngine.Sky",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"Name": "Sky",
+			"Transform": {
+				"Translation": {
+					"X": 40.0,
+					"Y": 150.0,
+					"Z": 0.0
+				}
+			},
+			"Sun": "217161db447023c698218091d33fce75"
+		},
+		{
+			"ID": "1a0666ee4341e44f68ec8e846d4a17d1",
+			"TypeName": "FlaxEngine.SkyLight",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"Name": "SkyLight",
+			"Brightness": 2.5,
+			"CustomTexture": "c54410104ff39427bc11e5bc761d66b0"
+		},
+		{
+			"ID": "968f6b544a46a590b2201ab25fd10387",
+			"TypeName": "FlaxEngine.Camera",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"Name": "Camera",
+			"Transform": {
+				"Translation": {
+					"X": 1600.0,
+					"Y": 2500.0,
+					"Z": -650.0
+				},
+				"Orientation": {
+					"X": 0.4617486596107483,
+					"Y": 0.0,
+					"Z": 0.0,
+					"W": 0.887010931968689
+				}
+			},
+			"FOV": 45.0,
+			"Near": 1000.0,
+			"Far": 20000.0
+		},
+		{
+			"ID": "e4ccc6014f2fb2e5fae9b988438863d8",
+			"TypeName": "Game.FlyCam",
+			"ParentID": "968f6b544a46a590b2201ab25fd10387",
+			"V": {
+	"horizontalSpeed": 2000.0,
+	"verticalSpeed": 2000.0,
+	"rotationSpeed": 100.0,
+	"tiltSpeed": 60.0
+}
+		},
+		{
+			"ID": "d7caa9274722fee9fa6c39a35d73c8e3",
+			"TypeName": "Game.MapInteractions",
+			"ParentID": "968f6b544a46a590b2201ab25fd10387",
+			"V": {
+	"camera": "968f6b544a46a590b2201ab25fd10387",
+	"tileMap": "f08465ce4d2b89c1c5f79b896d48f0cb"
+}
+		},
+		{
+			"ID": "d4b11dd14e331b2785721abd090a9e5d",
+			"TypeName": "FlaxEngine.EmptyActor",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"Name": "Map"
+		},
+		{
+			"ID": "f08465ce4d2b89c1c5f79b896d48f0cb",
+			"TypeName": "Game.TileMap",
+			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
+			"V": {
+	"tileGenerator": "a6ada20e4d5dae961eb87b969dc8e846",
+	"MapSize": {
+		"X": 35,
+		"Y": 24
+	},
+	"TileMaterial": "70d5ac44462edc08012cacaec4193faa",
+	"PlacementMaterial": "6b10588649a5c4cdec930b87fb2f4a90",
+	"EntryTiles": [
+		16,
+		18
+	]
+}
+		}
+	]
+}
