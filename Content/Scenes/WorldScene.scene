@@ -33,6 +33,36 @@
 }
 		},
 		{
+			"ID": "804f3ae343c3ad7a5bd06ea316a69e09",
+			"TypeName": "Game.BusController",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"V": {
+	"busPrefab": "11d5c5cd4678512285b90bb783997694",
+	"spawnInterval": 5.0,
+	"spawnTransform": {
+		"Translation": {
+			"X": 6600.0,
+			"Y": -15.0,
+			"Z": -1340.0
+		},
+		"Orientation": {
+			"X": 0.0,
+			"Y": -0.70710677,
+			"Z": 0.0,
+			"W": 0.70710677
+		},
+		"Scale": {
+			"X": 1.0,
+			"Y": 1.0,
+			"Z": 1.0
+		}
+	},
+	"stopXPosition": 3600.0,
+	"moveSpeed": 600.0,
+	"acceleration": 800.0
+}
+		},
+		{
 			"ID": "217161db447023c698218091d33fce75",
 			"TypeName": "FlaxEngine.DirectionalLight",
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
@@ -44,13 +74,20 @@
 					"Z": 0.0
 				},
 				"Orientation": {
-					"X": 0.3826834559440613,
-					"Y": 0.0,
-					"Z": 0.0,
-					"W": 0.9238795042037964
+					"X": 0.3639535903930664,
+					"Y": 0.28549447655677798,
+					"Z": -0.11825569719076157,
+					"W": 0.8786616325378418
 				}
 			},
-			"Brightness": 3.0
+			"Color": {
+				"R": 0.9921568632125855,
+				"G": 1.0,
+				"B": 0.8745098114013672,
+				"A": 1.0
+			},
+			"Brightness": 4.0,
+			"ContactShadowsLength": 0.02500000037252903
 		},
 		{
 			"ID": "5ee5628d425378acacb2dc8efe78aa33",
@@ -71,6 +108,12 @@
 			"TypeName": "FlaxEngine.SkyLight",
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
 			"Name": "SkyLight",
+			"Color": {
+				"R": 0.8274509906768799,
+				"G": 0.7882353067398071,
+				"B": 1.0,
+				"A": 1.0
+			},
 			"Brightness": 2.5,
 			"CustomTexture": "c54410104ff39427bc11e5bc761d66b0"
 		},
@@ -81,9 +124,9 @@
 			"Name": "Camera",
 			"Transform": {
 				"Translation": {
-					"X": 1600.0,
-					"Y": 2500.0,
-					"Z": -650.0
+					"X": 3500.0,
+					"Y": 3471.733642578125,
+					"Z": -2680.414794921875
 				},
 				"Orientation": {
 					"X": 0.4617486596107483,
@@ -108,15 +151,6 @@
 }
 		},
 		{
-			"ID": "d7caa9274722fee9fa6c39a35d73c8e3",
-			"TypeName": "Game.MapInteractions",
-			"ParentID": "968f6b544a46a590b2201ab25fd10387",
-			"V": {
-	"camera": "968f6b544a46a590b2201ab25fd10387",
-	"tileMap": "f08465ce4d2b89c1c5f79b896d48f0cb"
-}
-		},
-		{
 			"ID": "d4b11dd14e331b2785721abd090a9e5d",
 			"TypeName": "FlaxEngine.EmptyActor",
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
@@ -132,12 +166,41 @@
 		"X": 35,
 		"Y": 24
 	},
-	"TileMaterial": "70d5ac44462edc08012cacaec4193faa",
-	"PlacementMaterial": "6b10588649a5c4cdec930b87fb2f4a90",
 	"EntryTiles": [
 		16,
 		18
+	],
+	"TileMaterial": "70d5ac44462edc08012cacaec4193faa",
+	"wallModel": "b9bd7f23410709f122c4eab9b19d3e52",
+	"treeModel": "54cca28a41557ade907a73833c00b147",
+	"treeMaterial": "507746d94f60695036ab5da258d577ed",
+	"placementColor": {
+		"R": 0.0,
+		"G": 0.4,
+		"B": 1.0,
+		"A": 1.0
+	},
+	"destructColor": {
+		"R": 0.95555556,
+		"G": 0.09496592,
+		"B": 0.1253893,
+		"A": 1.0
+	},
+	"entranceModel": "60610fa442e4cfbd70fe4ca567ebf54a",
+	"sidewalkModel": "88a2b16b404553659bc6b4b531da896b",
+	"busLaneModels": [
+		"8d64aac8463c45cf2f3c0a9dd5c39795",
+		"291e76204404bc2c074472a749aa9ab7"
 	]
+}
+		},
+		{
+			"ID": "cc8ca20249c4cf22e2e224b390243b24",
+			"TypeName": "Game.MapInteractions",
+			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
+			"V": {
+	"camera": "968f6b544a46a590b2201ab25fd10387",
+	"tileMap": "f08465ce4d2b89c1c5f79b896d48f0cb"
 }
 		}
 	]

@@ -180,6 +180,7 @@
 
   <ItemGroup>
     <Compile Include="Game.Gen.cs" />
+    <Compile Include="Game\Scripts\Gameplay\BusController.cs" />
     <Compile Include="Game\Scripts\Gameplay\MapInteractions.cs" />
     <Compile Include="Game\Scripts\TileMap\TileGenerator.cs" />
     <Compile Include="Game\Scripts\TileMap\TileMap.cs" />

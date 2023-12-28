@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices;
-using System.Xml;
-using FlaxEditor.Windows;
+using System.Collections.Specialized;
+using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using FlaxEngine;
-using FlaxEngine.GUI;
+using FlaxEngine.Utilities;
 using Scripts;
 
 namespace Game;
@@ -20,21 +19,60 @@ using TileSide = TileGenerator.TileSide;
 /// </summary>
 public class TileMap : Script
 {
+    public enum ItemType {
+        None,
+        Tree,
+        Wall
+    }
+
+    public enum SelectionMode
+    {
+        Demolish,
+    }
+
+
+    private struct ItemMapData
+    {
+        public ItemType mtype;
+        public Int2 origin;
+        public ModelInstanceActor actor;
+
+        public ItemMapData()
+        {
+            mtype = ItemType.None;
+            actor = null;
+        }
+    }
+
     public TileGenerator tileGenerator;
     // Grid size of the starting map
     public Int2 MapSize = new(16, 16);
-    // Material to assign to created tiles
-    public MaterialBase TileMaterial;
-    // Material to assign to tiles for the planning phase.
-    public MaterialBase PlacementMaterial;
     // Grid X coordinates at the bottom of the map where the park can connect
     // to the outside world.
     public int[] EntryTiles = [];
-    
+
+    // Material to assign to created tiles
+    public MaterialBase TileMaterial;
+
+    public Model wallModel;
+
+    public Model treeModel;
+    public MaterialBase treeMaterial;
+
+    public Color placementColor;
+    public Color destructColor;
+
+    public Model entranceModel;
+
+    public Model sidewalkModel;
+    public Model[] busLaneModels;
+
     // Group and floor type pairing for each map cell position.
     private FloorData[] mapData;
     // ID of meshes placed at each map cell position.
-    private Guid[] mapMeshIds;
+    private StaticModel[] mapMeshes;
+
+    private ItemMapData[] itemMap;
 
     private (Int2 A, Int2 B) tempPosition;
     private FloorGroup tempGroup;
@@ -44,9 +82,35 @@ public class TileMap : Script
     private Int2 tempMapSize;
     private int[] tempMap;
 
+    private Dictionary<ItemType, StaticModel> itemModels = [];
+    private ItemType tempItemType;
+    private StaticModel tempItem = null;
+
+    private MaterialInstance tilePlacementMaterial;
+    private MaterialInstance plantPlacementMaterial;
+
+    // Determines how selected models are shown.
+    private SelectionMode selectionMode;
+    // Mainly used to update the material of meshes for operations, like destruction.
+    private HashSet<ModelInstanceActor> selectedModels;
+    // A pair of original and updated material of selected objects.
+    private Dictionary<MaterialBase, MaterialInstance> selectionMaterials;
+    // Reverse of selectionMaterials.
+    private Dictionary<MaterialInstance, MaterialBase> deselectionMaterials;
+
     /// <inheritdoc/>
     public override void OnStart()
     {
+        tilePlacementMaterial = TileMaterial.CreateVirtualInstance();
+        tilePlacementMaterial.SetParameterValue("EmissiveColor", placementColor);
+
+        plantPlacementMaterial = treeMaterial.CreateVirtualInstance();
+        plantPlacementMaterial.SetParameterValue("EmissiveColor", placementColor);
+
+        selectedModels = [];
+        selectionMaterials = [];
+        deselectionMaterials = [];
+
         GenerateMap();
     }
     
@@ -106,38 +170,17 @@ public class TileMap : Script
         return mapData[TileIndex(pos_x, pos_y)];
     }
 
-    // Shows or hides a temporary tile to demonstrate the effect of placing something on the map.
-    public void ShowTemporaryTile(Int2 tilePos, FloorGroup group)
+    public ItemType ItemTypeAt(Int2 tilePos)
     {
-        if (tempPosition != (tilePos, tilePos) || tempGroup != group)
-            HideTemporaryTiles();
+        return ItemTypeAt(tilePos.X, tilePos.Y);
+    }
 
-        tempPosition = (tilePos, tilePos);
-        tempGroup = group;
-
-        var ix = TileIndex(tilePos);
-        if (ix < 0 || mapData[ix].group == group)
-            return;
-        
-        CreateTemporaryTile(tilePos, group, FloorTypeForSides(TileSidesForPosition(tilePos, group)), true);
-
-        if (TileGroupAt(tilePos.X - 1, tilePos.Y) == group)
-            CreateTemporaryTile(tilePos.X - 1, tilePos.Y, group, FloorTypeForSides(TileSidesForPosition(tilePos.X - 1, tilePos.Y, group) | TileSide.Right));
-        if (TileGroupAt(tilePos.X, tilePos.Y - 1) == group)
-            CreateTemporaryTile(tilePos.X, tilePos.Y - 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X, tilePos.Y - 1, group) | TileSide.Top));
-        if (TileGroupAt(tilePos.X + 1, tilePos.Y) == group)
-            CreateTemporaryTile(tilePos.X + 1, tilePos.Y, group, FloorTypeForSides(TileSidesForPosition(tilePos.X + 1, tilePos.Y, group) | TileSide.Left));
-        if (TileGroupAt(tilePos.X, tilePos.Y + 1) == group)
-            CreateTemporaryTile(tilePos.X, tilePos.Y + 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X, tilePos.Y + 1, group) | TileSide.Bottom));
-
-        if (TileGroupAt(tilePos.X - 1, tilePos.Y - 1) == group)
-            CreateTemporaryTile(tilePos.X - 1, tilePos.Y - 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X - 1, tilePos.Y - 1, group) | TileSide.TopRight));
-        if (TileGroupAt(tilePos.X + 1, tilePos.Y - 1) == group)
-            CreateTemporaryTile(tilePos.X + 1, tilePos.Y - 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X + 1, tilePos.Y - 1, group) | TileSide.TopLeft));
-        if (TileGroupAt(tilePos.X + 1, tilePos.Y + 1) == group)
-            CreateTemporaryTile(tilePos.X + 1, tilePos.Y + 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X + 1, tilePos.Y + 1, group) | TileSide.BottomLeft));
-        if (TileGroupAt(tilePos.X - 1, tilePos.Y + 1) == group)
-            CreateTemporaryTile(tilePos.X - 1, tilePos.Y + 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X - 1, tilePos.Y + 1, group) | TileSide.BottomRight));
+    public ItemType ItemTypeAt(int pos_x, int pos_y)
+    {
+        var index = TileIndex(pos_x, pos_y);
+        if (index < 0)
+            return ItemType.None;
+        return itemMap[index].mtype;
     }
 
     public void PlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped = false)
@@ -145,31 +188,179 @@ public class TileMap : Script
         InnerPlaceTileSpan(posA, posB, group, flipped, false, false);
     }
 
+    public void ShowTemporaryTile(Int2 tilePos, FloorGroup group)
+    {
+        InnerPlaceTileSpan(tilePos, tilePos, group, false, true, false);
+    }
+
+    // Shows one or multiple temporary tiles to demonstrate the effect of placing something on the map.
+    // Nothing is shown if the starting position is invalid.
     public void ShowTemporaryTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool forceUpdate)
     {
         InnerPlaceTileSpan(posA, posB, group, flipped, true, forceUpdate);
     }
 
-    private void InnerPlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool temp, bool forceUpdate)
+    public void ShowTemporaryModel(Int2 tilePos, ItemType mtype)
     {
-        if (posA == posB)
+        if (tempPosition.A == tilePos && tempItemType == mtype)
+            return;
+
+        tempPosition.A = tilePos;
+        tempItemType = mtype;
+
+        HideTemporaryModels();
+
+        if (TileGroupAt(tilePos) != FloorGroup.Grass || ItemTypeAt(tilePos) != ItemType.None)
+            return;
+
+        StaticModel smodel;
+        if (!itemModels.TryGetValue(mtype, out smodel))
         {
-            if (temp)
-                ShowTemporaryTile(posA, group);
-            else
-                PlaceTile(posA, group);
+            smodel = new StaticModel
+            {
+                Model = treeModel
+            };
+            smodel.SetMaterial(0, plantPlacementMaterial);
+            itemModels[mtype] = smodel;
+            smodel.SetParent(Actor, false);
+        }
+        var tileDim = tileGenerator.TileDimension;
+        smodel.Position = new(tilePos.X * tileDim, 0.0, tilePos.Y * tileDim);
+        smodel.IsActive = true;
+        tempItem = smodel;
+    }
+
+    public void PlaceModel(Int2 tilePos, ItemType mtype)
+    {
+        var group = TileGroupAt(tilePos);
+        if (group != FloorGroup.Grass)
+            return;
+
+        if (ItemTypeAt(tilePos) != ItemType.None)
+            return;
+
+        HideTemporaryModels();
+
+        var tileDim = tileGenerator.TileDimension;
+        var smodel = Actor.AddChild<StaticModel>();
+        smodel.Model = treeModel;
+        smodel.Position = new(tilePos.X * tileDim, 0.0, tilePos.Y * tileDim);
+        var index = TileIndex(tilePos);
+        itemMap[index].mtype = mtype;
+        itemMap[index].origin = tilePos;
+        itemMap[index].actor = smodel;
+    }
+
+    public void ShowDemolishObjects(Int2 posA, Int2 posB)
+    {
+        HideTemporaryModels();
+
+        var index = TileIndex(posA);
+
+        selectionMode = SelectionMode.Demolish;
+        
+        if (index < 0 /*|| (itemMap[index].mtype == ItemType.None && (mapData[index].group == FloorGroup.None || mapData[index].group == FloorGroup.Grass))*/)
+        {
+            DeselectAll();
             return;
         }
+        
+        HashSet<ModelInstanceActor> newSelection = [];
+        for (int ix = Mathf.Min(posA.X, posB.X), siz = Mathf.Max(posA.X, posB.X) + 1; ix < siz; ++ix)
+        {
+            if (ix < 0 || ix >= MapSize.X)
+                continue;
+            
+            for (int iy = Mathf.Min(posA.Y, posB.Y), ysiz = Mathf.Max(posA.Y, posB.Y) + 1; iy < ysiz; ++iy)
+            {
+                if (iy < 0)
+                    continue;
+                if (iy >= MapSize.Y)
+                    break;
+                
+                index = TileIndex(ix, iy);
 
-        bool invalidIndex = TileIndex(posA) < 0 || TileIndex(posB) < 0;
+                if (itemMap[index].mtype != ItemType.None)
+                    newSelection.Add(itemMap[index].actor);
+                else
+                    newSelection.Add(mapMeshes[index]);
+            }
+        }
+        UpdateSelectionModels(newSelection);
+    }
 
-        if (invalidIndex || !temp || tempPosition != (posA, posB) || tempGroup != group || forceUpdate)
-            HideTemporaryTiles();
+    public void DeselectAll()
+    {
+        if (selectedModels.Count == 0)
+            return;
+        UpdateSelectionModels(null);
+    }
 
-        tempPosition = (posA, posB);
-        tempGroup = group;
+    private void UpdateSelectionModels(HashSet<ModelInstanceActor> models)
+    {
+        var deselect = models == null ? selectedModels : selectedModels.Except(models);
+        var newselect = models?.Except(selectedModels);
 
-        if (invalidIndex || (!forceUpdate && mapData[TileIndex(posA)].group == group))
+        foreach (var actor in deselect)
+        {
+            for (int ix = 0, siz = actor.MaterialSlots.Length; ix < siz; ++ix)
+            {
+                actor.SetMaterial(ix, deselectionMaterials[actor.GetMaterial(ix) as MaterialInstance]);
+            }
+        }        
+
+        if (newselect != null && newselect.Any())
+        {
+            Color color;
+            switch(selectionMode)
+            {
+                case SelectionMode.Demolish:
+                    color = destructColor;
+                    break;
+                default:
+                    color = Color.Black;
+                    break;
+            }
+
+            foreach (var actor in newselect)
+            {
+                for (int ix = 0, siz = actor.MaterialSlots.Length; ix < siz; ++ix)
+                {
+                    //actor.SetMaterial(0, null);
+                    var mat = actor.GetMaterial(ix);
+                    
+                    MaterialInstance selmat;
+                    if (!selectionMaterials.TryGetValue(mat, out selmat))
+                    {
+                        selmat = mat.CreateVirtualInstance();
+                        selmat.SetParameterValue("EmissiveColor", color);
+                        selectionMaterials.Add(mat, selmat);
+                        deselectionMaterials.Add(selmat, mat);
+                    }
+                    actor.SetMaterial(ix, selmat);
+                }
+            }
+        }
+        selectedModels = models ?? ([]);
+    }
+
+    private void InnerPlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool temp, bool forceUpdate)
+    {
+         if (temp)
+        {
+            if (!forceUpdate && tempPosition == (posA, posB) && tempGroup == group)
+                return;
+
+            tempPosition = (posA, posB);
+            tempGroup = group;
+        }
+
+        HideTemporaryModels();
+
+        (int indexA, int indexB) = (TileIndex(posA), TileIndex(posB));
+        bool invalidIndex = indexA < 0 || indexB < 0;
+
+        if (invalidIndex || mapData[indexA].group == group || itemMap[indexA].mtype != ItemType.None)
             return;
 
         CreateTemporaryMap(posA, posB);
@@ -177,19 +368,19 @@ public class TileMap : Script
         if ((Mathf.Abs(posA.X - posB.X) >= Mathf.Abs(posB.Y - posA.Y )) ^ flipped)
         {
             for (int dif = posA.X < posB.X ? 1 : -1, x = posA.X, end = posB.X + dif; x != end; x += dif)
-                if (TileGroupAt(x, posA.Y) != group)
+                if (TileGroupAt(x, posA.Y) != group && ItemTypeAt(x, posA.Y) == ItemType.None)
                     PlotOnTemporaryMap(x, posA.Y);
             for (int dif = posA.Y < posB.Y ? 1 : -1, y = posA.Y, end = posB.Y + dif; y != end; y += dif)
-                if (TileGroupAt(posB.X, y) != group)
+                if (TileGroupAt(posB.X, y) != group && ItemTypeAt(posB.X, y) == ItemType.None)
                     PlotOnTemporaryMap(posB.X, y);
         }
         else
         {
             for (int dif = posA.Y < posB.Y ? 1 : -1, y = posA.Y, end = posB.Y + dif; y != end; y += dif)
-                if (TileGroupAt(posA.X, y) != group)
+                if (TileGroupAt(posA.X, y) != group && ItemTypeAt(posA.X, y) == ItemType.None)
                     PlotOnTemporaryMap(posA.X, y);
             for (int dif = posA.X < posB.X ? 1 : -1, x = posA.X, end = posB.X + dif; x != end; x += dif)
-                if (TileGroupAt(x, posB.Y) != group)
+                if (TileGroupAt(x, posB.Y) != group && ItemTypeAt(x, posB.Y) == ItemType.None)
                     PlotOnTemporaryMap(x, posB.Y);
         }
 
@@ -227,8 +418,8 @@ public class TileMap : Script
     {
         // No error checks. We assume the parameters always make sense.
 
-        posX = posX - tempMapOrigin.X;
-        posY = posY - tempMapOrigin.Y;
+        posX -= tempMapOrigin.X;
+        posY -= tempMapOrigin.Y;
         tempMap[posX + posY * tempMapSize.X] = 2;
 
         tempMap[posX + posY * tempMapSize.X - 1] = Mathf.Max(1, tempMap[posX + posY * tempMapSize.X - 1]);
@@ -248,46 +439,18 @@ public class TileMap : Script
         tempMap = null;
     }
 
-    public void HideTemporaryTiles()
+    public void HideTemporaryModels()
     {
         tempTiles.ForEach(sm => Destroy(sm));
         tempTiles = [];
+
+        tempItemType = ItemType.None;
+        if (tempItem != null)
+            tempItem.IsActive = false;
+
+        tempPosition = new(new(-1,-1), new(-1,-1));
     }
 
-
-    public void PlaceTile(Int2 tilePos, FloorGroup group)
-    {
-        var ix = TileIndex(tilePos);
-        if (ix < 0 || mapData[ix].group == group)
-        {
-            Debug.Log("PlaceTile refused");
-            return;
-        }
-            Debug.Log("PlaceTile accepted");
-
-        HideTemporaryTiles();
-
-        SetTile(tilePos, group, FloorTypeForSides(TileSidesForPosition(tilePos, group)));
-        if (TileGroupAt(tilePos.X - 1, tilePos.Y) == group)
-            SetTile(tilePos.X - 1, tilePos.Y, group, FloorTypeForSides(TileSidesForPosition(tilePos.X - 1, tilePos.Y, group)));
-        if (TileGroupAt(tilePos.X, tilePos.Y - 1) == group)
-            SetTile(tilePos.X, tilePos.Y - 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X, tilePos.Y - 1, group)));
-        if (TileGroupAt(tilePos.X + 1, tilePos.Y) == group)
-            SetTile(tilePos.X + 1, tilePos.Y, group, FloorTypeForSides(TileSidesForPosition(tilePos.X + 1, tilePos.Y, group)));
-        if (TileGroupAt(tilePos.X, tilePos.Y + 1) == group)
-            SetTile(tilePos.X, tilePos.Y + 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X, tilePos.Y + 1, group)));
-
-        if (TileGroupAt(tilePos.X - 1, tilePos.Y - 1) == group)
-            SetTile(tilePos.X - 1, tilePos.Y - 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X - 1, tilePos.Y - 1, group)));
-        if (TileGroupAt(tilePos.X + 1, tilePos.Y - 1) == group)
-            SetTile(tilePos.X + 1, tilePos.Y - 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X + 1, tilePos.Y - 1, group)));
-        if (TileGroupAt(tilePos.X + 1, tilePos.Y + 1) == group)
-            SetTile(tilePos.X + 1, tilePos.Y + 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X + 1, tilePos.Y + 1, group)));
-        if (TileGroupAt(tilePos.X - 1, tilePos.Y + 1) == group)
-            SetTile(tilePos.X - 1, tilePos.Y + 1, group, FloorTypeForSides(TileSidesForPosition(tilePos.X - 1, tilePos.Y + 1, group)));
-
-    }
-    
     // Creates the initial world with only grass tiles in MapSize grid dimensions.
     private void GenerateMap()
     {
@@ -295,44 +458,103 @@ public class TileMap : Script
         var grassTile = tileGenerator.GetModel(FloorGroup.Grass, FloorType.FullTile);
 
         mapData = new FloorData[MapSize.X * MapSize.Y];
-        mapMeshIds = new Guid[MapSize.X * MapSize.Y];
+        //mapMeshIds = new Guid[MapSize.X * MapSize.Y];
+        mapMeshes = new StaticModel[MapSize.X * MapSize.Y];
+
+        itemMap = new ItemMapData[MapSize.X * MapSize.Y];
 
         for (int ix = 0, siz = MapSize.X * MapSize.Y; ix < siz; ++ix)
         {
             var tile = CreateTile(new Vector3(ix % MapSize.X * tileDim, 0.0, ix / MapSize.X * tileDim), grassTile);
             mapData[ix] = (FloorGroup.Grass, FloorType.FullTile);
-            mapMeshIds[ix] = tile.ID;
+            //mapMeshIds[ix] = tile.ID;
+            mapMeshes[ix] = tile;
         }
 
         // Build the outer side to the park from generated tile data instead of models.
-        (FloorGroup, FloorType)[] groundData = new (FloorGroup, FloorType)[MapSize.X * 2];
-        for (int ix = 0, siz = MapSize.X * 2; ix < siz; ++ix)
+        const int extraHeight = 4;
+        const int skipHeight = 5;
+        const int endingHeight = 3;
+        (FloorGroup, FloorType)[] groundData = new (FloorGroup, FloorType)[MapSize.X * (extraHeight + skipHeight + endingHeight)];
+
+        for (int ix = 0, siz = MapSize.X * endingHeight; ix < siz; ++ix)
             groundData[ix] = (FloorGroup.Grass, FloorType.FullTile);
 
+        for (int ix = MapSize.X * (endingHeight + skipHeight), siz = MapSize.X * (endingHeight + skipHeight + extraHeight); ix < siz; ++ix)
+            groundData[ix] = (FloorGroup.Grass, FloorType.FullTile);
         foreach (int posX in EntryTiles)
         {
-            groundData[MapSize.X * 0 + posX] = (FloorGroup.WalkwayOnGrass, FloorTypeForSides(TileSide.Top | TileSide.Bottom));
-            groundData[MapSize.X * 1 + posX] = (FloorGroup.WalkwayOnGrass, FloorTypeForSides(TileSide.Top | TileSide.Bottom));
+            for (int ix = endingHeight + skipHeight, siz = endingHeight + skipHeight + extraHeight; ix < siz; ++ix)
+                groundData[MapSize.X * ix + posX] = (FloorGroup.WalkwayOnGrass, FloorTypeForSides(TileSide.Top | TileSide.Bottom));
         }
-        var model = tileGenerator.CreateModel(groundData, MapSize.X, 2);
+        var model = tileGenerator.CreateModel(groundData, MapSize.X, extraHeight + skipHeight + endingHeight);
         
         var ground = Actor.AddChild<StaticModel>();
         ground.Model = model;
-        ground.Position = new Vector3(0.0, 0.0, -tileDim * 2.0f);
+        ground.Position = new Vector3(0.0, 0.0, -tileDim * (extraHeight + skipHeight + endingHeight));
         ground.SetMaterial(0, TileMaterial);
-        
 
-        // Float3[] grassV;
-        // int[] grassIx;
-        // Float2[] grassUV;
-        // Float3[] grassN;
-        // tileGenerator.GetInstanceData(FloorGroup.Grass, FloorType.FullTile, out grassV, out grassIx, out grassUV, out grassN);
-        // Float3[] vroadV;
-        // int[] vroadIx;
-        // Float2[] vroadUV;
-        // Float3[] vroadN;
-        // tileGenerator.GetInstanceData(FloorGroup.Grass, FloorType.FullTile, out vroadV, out vroadIx, out vroadUV, out vroadN);
-        
+        if (EntryTiles.Length > 0)
+        {
+            var wall1 = tileGenerator.CreateRowOfModel(wallModel, EntryTiles[0] - 1, 1, tileDim, 0.0f);
+            if (wall1 != null)
+            {
+                var wallModel = Actor.AddChild<StaticModel>();
+                wallModel.Model = wall1;
+                wallModel.Position = new Vector3(0.0, 0.0, -tileDim);
+            }
+            var trees1 = tileGenerator.CreateRowOfModel(treeModel, EntryTiles[0] - 1, 1, tileDim, 0.0f);
+            if (trees1 != null)
+            {
+                var treesModel = Actor.AddChild<StaticModel>();
+                treesModel.Model = trees1;
+                treesModel.Position = new Vector3(0.0, 0.0, -tileDim * 2.0);
+            }
+
+            int from = EntryTiles.Last() + 2;
+            var wall2 = tileGenerator.CreateRowOfModel(wallModel, MapSize.X - from, 1, tileDim, 0.0f);
+            if (wall2 != null)
+            {
+                var wallModel = Actor.AddChild<StaticModel>();
+                wallModel.Model = wall2;
+                wallModel.Position = new Vector3(from * tileDim, 0.0, -tileDim);
+            }
+
+            var trees2 = tileGenerator.CreateRowOfModel(treeModel, MapSize.X - from, 1, tileDim, 0.0f);
+            if (trees2 != null)
+            {
+                var treesModel = Actor.AddChild<StaticModel>();
+                treesModel.Model = trees2;
+                treesModel.Position = new Vector3(from * tileDim, 0.0, -tileDim * 2.0);
+            }
+        }
+        var entrance = Actor.AddChild<StaticModel>();
+        entrance.Model = entranceModel;
+        entrance.Position = new Vector3(MapSize.X * 0.5 * tileDim, 0.0, -tileDim);
+
+        // Two lanes of sidewalk.
+        var sidewalk = tileGenerator.CreateRowOfModel(sidewalkModel, MapSize.X, 2, tileDim, tileDim);
+        if (sidewalk != null)
+        {
+            var sidewalkActor = Actor.AddChild<StaticModel>();
+            sidewalkActor.Model = sidewalk;
+            sidewalkActor.Position = new Vector3(0.0, 0.0, -tileDim * 6.0);
+        }
+
+        var laneModelIndexes = new int[MapSize.X];
+        var laneModelPositions = new Vector3[MapSize.X];
+        for (int ix = 0, siz = MapSize.X; ix < siz; ++ix)
+        {
+            laneModelIndexes[ix] = ix % busLaneModels.Length;
+            laneModelPositions[ix] = new Vector3(tileDim * ix, 0.0, 0.0);
+        }
+        var busLane = tileGenerator.CreateCompoundModel(busLaneModels, laneModelIndexes, laneModelPositions);
+        if (busLane != null)
+        {
+            var busLaneActor = Actor.AddChild<StaticModel>();
+            busLaneActor.Model = busLane;
+            busLaneActor.Position = new Vector3(0.0, 0.0, -tileDim * 6.0);
+        }
 
     }
 
@@ -460,7 +682,7 @@ public class TileMap : Script
         var tile = Actor.AddChild<StaticModel>();
         tile.Model = model;
         tile.Position = world_pos;
-        tile.SetMaterial(0, placement ? PlacementMaterial : TileMaterial);
+        tile.SetMaterial(0, placement ? tilePlacementMaterial : TileMaterial);
         return tile;
     }
 
@@ -474,9 +696,11 @@ public class TileMap : Script
         var tileDim = tileGenerator.TileDimension;
         var tile = CreateTile(new Vector3(pos_x * tileDim, 0.0, pos_y * tileDim), group, ftype, false);
         var index = TileIndex(pos_x, pos_y);
-        Destroy(Find<StaticModel>(ref mapMeshIds[index]));
+        //Destroy(Find<StaticModel>(ref mapMeshIds[index]));
+        Destroy(ref mapMeshes[index]);
         mapData[index] = (group, ftype);
-        mapMeshIds[index] = tile.ID;
+        //mapMeshIds[index] = tile.ID;
+        mapMeshes[index] = tile;
     }
 
     private static TileSide CombineSides(TileSide a, TileSide b)

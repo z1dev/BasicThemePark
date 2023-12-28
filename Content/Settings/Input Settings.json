@@ -3,7 +3,16 @@
 	"TypeName": "FlaxEditor.Content.Settings.InputSettings",
 	"EngineBuild": 6407,
 	"Data": {
-	"ActionMappings": [],
+	"ActionMappings": [
+		{
+			"Name": "SwitchBuild",
+			"Mode": 1,
+			"Key": 9,
+			"MouseButton": 0,
+			"GamepadButton": 0,
+			"Gamepad": 0
+		}
+	],
 	"AxisMappings": [
 		{
 			"Name": "CamHorz",

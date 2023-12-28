@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography.X509Certificates;
+﻿using System.Collections.Generic;
 using FlaxEngine;
-using FlaxEngine.Assertions;
-using FlaxEngine.Utilities;
 
 namespace Scripts;
 
@@ -500,6 +493,9 @@ public class TileGenerator : Script
 
         foreach (var pair in data)
         {
+            if (pair.group == FloorGroup.None)
+                continue;
+
             TileDataCache tileData;
             if (!cache.TryGetValue(pair, out tileData))
             {
@@ -523,25 +519,28 @@ public class TileGenerator : Script
 
         foreach (var pair in data)
         {
-            var tileData = cache[pair];
-
-            tileData.verts.CopyTo(verts, vertpos);
-            tileData.uvs.CopyTo(uvs, vertpos);
-            tileData.indexes.CopyTo(indexes, indexpos);
-            tileData.normals.CopyTo(normals, vertpos);
-
-            for (int ix = 0, siz = tileData.verts.Length; ix < siz; ++ix)
+            if (pair.group != FloorGroup.None)
             {
-                verts[vertpos + ix].X += TileDimension * posX;
-                verts[vertpos + ix].Z += TileDimension * posY;
+                var tileData = cache[pair];
+
+                tileData.verts.CopyTo(verts, vertpos);
+                tileData.uvs.CopyTo(uvs, vertpos);
+                tileData.indexes.CopyTo(indexes, indexpos);
+                tileData.normals.CopyTo(normals, vertpos);
+
+                for (int ix = 0, siz = tileData.verts.Length; ix < siz; ++ix)
+                {
+                    verts[vertpos + ix].X += TileDimension * posX;
+                    verts[vertpos + ix].Z += TileDimension * posY;
+                }
+
+                for (int ix = 0, siz = tileData.indexes.Length; ix < siz; ++ix)
+                    indexes[indexpos + ix] += vertpos;
+
+                vertpos += tileData.verts.Length;
+                indexpos += tileData.indexes.Length;
             }
-
-            for (int ix = 0, siz = tileData.indexes.Length; ix < siz; ++ix)
-                indexes[indexpos + ix] += vertpos;
-
-            vertpos += tileData.verts.Length;
-            indexpos += tileData.indexes.Length;
-
+            
             ++posX;
             if (posX >= width)
             {
@@ -555,6 +554,210 @@ public class TileGenerator : Script
         Model new_model = Content.CreateVirtualAsset<Model>();
         new_model.SetupLODs([1]);
         new_model.LODs[0].Meshes[0].UpdateMesh(vertices: verts, triangles: indexes, normals: normals, uv: uvs);
+        return new_model;
+    }
+
+    public Model CreateRowOfModel(in Model model, int columns, int rows, float offsetX, float offsetZ)
+    {
+        if (model == null || columns <= 0 || rows <= 0)
+            return null;
+        
+        if (!model.IsLoaded && !model.WaitForLoaded())
+            return null;
+
+        // First gather some data. Read the size of arrays needed to create a copy of the model from
+        // every LOD and sub mesh.
+
+        int meshCount = 0;
+        int[] lodMeshes = new int[model.LODs.Length];
+        for (int lix = 0, lsiz = model.LODs.Length; lix < lsiz; ++lix)
+        {
+            meshCount += model.LODs[lix].Meshes.Length;
+            lodMeshes[lix] = model.LODs[lix].Meshes.Length;
+        }
+
+        Model new_model = Content.CreateVirtualAsset<Model>();
+        new_model.SetupLODs(lodMeshes);
+        new_model.SetupMaterialSlots(model.MaterialSlotsCount);
+
+        for (int lix = 0, lsiz = model.LODs.Length; lix < lsiz; ++lix)
+        {
+            for (int mix = 0, msiz = model.LODs[lix].Meshes.Length; mix < msiz; ++mix)
+            {
+                var mesh = model.LODs[lix].Meshes[mix];
+                var vBuff = mesh.DownloadVertexBuffer();
+                var iBuff = mesh.DownloadIndexBuffer();
+
+                var indexes = new uint[iBuff.Length * columns * rows];
+                var verts = new Float3[vBuff.Length * columns * rows];
+                var normals = new Float3[vBuff.Length * columns * rows];
+                var uvs = new Float2[vBuff.Length * columns * rows];
+
+                uint indexCount = (uint)iBuff.Length;
+                uint indexPos = 0;
+
+                int vertexCount = vBuff.Length;
+                int vertexPos = 0;
+
+                for (int ix = 0; ix < columns; ++ix)
+                {
+                    for (int iy = 0; iy < rows; ++iy)
+                    {
+                        for (int nix = 0; nix < indexCount; ++nix)
+                        {
+                            indexes[nix + indexPos] = iBuff[nix] + (uint)vertexPos;
+                        }
+                        indexPos += indexCount;
+
+                        for (int vix = 0; vix < vertexCount; ++vix)
+                        {
+                            verts[vix + vertexPos] = vBuff[vix].Position + new Float3(offsetX * ix, 0.0f, offsetZ * iy);
+                            normals[vix + vertexPos] = vBuff[vix].Normal;
+                            uvs[vix + vertexPos] = vBuff[vix].TexCoord;
+                        }
+                        vertexPos += vertexCount;
+                    }
+                }
+
+                new_model.LODs[lix].Meshes[mix].UpdateMesh(vertices: verts, triangles: indexes, normals: normals, uv: uvs);
+                new_model.LODs[lix].Meshes[mix].MaterialSlotIndex = mesh.MaterialSlotIndex;
+            }
+            for (int six = 0, ssiz = model.MaterialSlotsCount; six < ssiz; ++six)
+            {
+                new_model.MaterialSlots[six].Material = model.MaterialSlots[six].Material;
+                new_model.MaterialSlots[six].Name = model.MaterialSlots[six].Name;
+                new_model.MaterialSlots[six].ShadowsMode = model.MaterialSlots[six].ShadowsMode;
+            }
+        }
+
+        //new_model.SetMaterial
+        return new_model;
+    }
+
+    // Generates a model made up of all the models in the `models` array. `modelIndexes` and `modelPositions`
+    // determine which model is placed at what location. These arrays must have the same number of elements.
+    // `modelIndexes` holds indexes of items in `models` and `modelPositions` determines where the models in
+    // `models` are placed.
+    // If the models don't have the same number of LODs, only the least number of LODs are generated.
+    // Currently meshes in models with the same material are not merged, and for each model, a separate mesh
+    // is created in the new model.
+    public Model CreateCompoundModel(in Model[] models, in int[] modelIndexes, in Vector3[] modelPositions)
+    {
+        if (models == null || models.Length == 0 || modelIndexes == null || modelIndexes.Length == 0 || modelPositions == null || modelPositions.Length == 0)
+        {
+            Debug.LogError("Missing data in CreateCompoundModel");
+            return null;
+        }
+        if (modelIndexes.Length != modelPositions.Length)
+        {
+            Debug.LogError("Model indexes and positions arrays must have the same number of values");
+            return null;
+        }
+
+        int lodCount = 0;
+        foreach (var m in models)
+        {
+            if (lodCount == 0)
+                lodCount = m.LODs.Length;
+            else
+                lodCount = Mathf.Min(lodCount, m.LODs.Length);
+        }
+        if (lodCount == 0)
+        {
+            Debug.LogError("No LODs found in meshes.");
+            return null;
+        }
+
+        int[] lodMeshes = new int[lodCount];
+        int matCount = 0;
+        for (int lix = 0; lix < lodCount; ++lix)
+        {
+            foreach (var m in models)
+            {
+                lodMeshes[lix] += m.LODs[lix].Meshes.Length;
+                matCount += m.MaterialSlotsCount;
+            }
+        }
+        
+        Model new_model = Content.CreateVirtualAsset<Model>();
+        new_model.SetupLODs(lodMeshes);
+        new_model.SetupMaterialSlots(matCount);
+
+        int[] uses = new int[modelIndexes.Length];
+        for (int lix = 0; lix < lodCount; ++lix)
+        {
+            int skippedSlotCount = 0;
+            int skippedMeshCount = 0;
+            for (int mix = 0, msiz = models.Length; mix < msiz; ++mix)
+            {
+                var m = models[mix];
+
+                // Create the meshes for this model at the current LOD.
+                // We need to first count the amount of data that has to be collected.
+
+                int useCount = 0;
+                for (int ixix = 0, ixsiz = modelIndexes.Length; ixix < ixsiz; ++ixix)
+                {
+                    if (modelIndexes[ixix] == mix)
+                    {
+                        uses[useCount] = ixix;
+                        ++useCount;
+                    }
+                }
+
+                // Model generation creates arrays to hold the given mesh as many times as it was
+                // found, then fills the arrays with clone of the original data and the position
+                // adjusted.
+
+                for (int meshix = 0, meshsiz = m.LODs[lix].Meshes.Length; meshix < meshsiz && useCount != 0; ++meshix)
+                {
+                    var mesh = m.LODs[lix].Meshes[meshix];
+                    var vBuff = mesh.DownloadVertexBuffer();
+                    var iBuff = mesh.DownloadIndexBuffer();
+
+                    var indexes = new uint[iBuff.Length * useCount];
+                    var verts = new Float3[vBuff.Length * useCount];
+                    var normals = new Float3[vBuff.Length * useCount];
+                    var uvs = new Float2[vBuff.Length * useCount];
+
+                    uint indexCount = (uint)iBuff.Length;
+                    uint indexPos = 0;
+
+                    int vertexCount = vBuff.Length;
+                    int vertexPos = 0;
+
+                    for (int iy = 0; iy < useCount; ++iy)
+                    {
+                        for (int nix = 0; nix < indexCount; ++nix)
+                        {
+                            indexes[nix + indexPos] = iBuff[nix] + (uint)vertexPos;
+                        }
+                        indexPos += indexCount;
+
+                        for (int vix = 0; vix < vertexCount; ++vix)
+                        {
+                            verts[vix + vertexPos] = vBuff[vix].Position + modelPositions[uses[iy]];
+                            normals[vix + vertexPos] = vBuff[vix].Normal;
+                            uvs[vix + vertexPos] = vBuff[vix].TexCoord;
+                        }
+                        vertexPos += vertexCount;
+                    }
+
+                    new_model.LODs[lix].Meshes[meshix + skippedMeshCount].UpdateMesh(vertices: verts, triangles: indexes, normals: normals, uv: uvs);
+                    new_model.LODs[lix].Meshes[meshix + skippedMeshCount].MaterialSlotIndex = mesh.MaterialSlotIndex + skippedSlotCount;
+                }
+
+                for (int six = 0, ssiz = m.MaterialSlotsCount; six < ssiz; ++six)
+                {
+                    new_model.MaterialSlots[six + skippedSlotCount].Material = m.MaterialSlots[six].Material;
+                    new_model.MaterialSlots[six + skippedSlotCount].Name = m.MaterialSlots[six].Name;
+                    new_model.MaterialSlots[six + skippedSlotCount].ShadowsMode = m.MaterialSlots[six].ShadowsMode;
+                }
+                skippedSlotCount += models[mix].MaterialSlotsCount;
+                skippedMeshCount += models[mix].LODs[lix].Meshes.Length;
+            }
+        }
+
         return new_model;
     }
 

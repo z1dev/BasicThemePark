@@ -10,6 +10,7 @@ using FloorGroup = TileGenerator.FloorGroup;
 
 using Vector3 = FlaxEngine.Vector3;
 using Quaternion = FlaxEngine.Quaternion;
+using ItemType = TileMap.ItemType;
 
 /// <summary>
 /// MapInteractions Script.
@@ -26,7 +27,17 @@ public class MapInteractions : Script
         None,
         CameraMove,
         CameraRotate,
-        TilePlacement
+        TilePlacement,
+        TreePlacement,
+        Selecting
+    }
+
+    private enum ToolSelection {
+        Road,
+        Tree,
+        Demolish,
+
+        MaxValue
     }
 
     // The tile coordinates under the cursor on the last frame or starting an operation, like placing a road.
@@ -49,6 +60,7 @@ public class MapInteractions : Script
     private bool needsTileUpdate = false;
 
     private Interaction interaction;
+    private ToolSelection tool;
 
     /// <inheritdoc/>
     public override void OnStart()
@@ -58,7 +70,7 @@ public class MapInteractions : Script
             flyCam.MovedOrRotated += new EventHandler(CameraMovedOrRotated);
     }
 
-    private void handleMouseWheel(Float2 f2, float f)
+    private void HandleMouseWheel(Float2 f2, float f)
     {
         if (interaction == Interaction.TilePlacement)
         {
@@ -70,13 +82,13 @@ public class MapInteractions : Script
     /// <inheritdoc/>
     public override void OnEnable()
     {
-        Input.MouseWheel += handleMouseWheel;
+        Input.MouseWheel += HandleMouseWheel;
     }
 
     /// <inheritdoc/>
     public override void OnDisable()
     {
-        Input.MouseWheel -= handleMouseWheel;
+        Input.MouseWheel -= HandleMouseWheel;
     }
 
     /// <inheritdoc/>
@@ -91,7 +103,19 @@ public class MapInteractions : Script
             if (tilepos != activeCoords)
             {
                 activeCoords = tilepos;
-                tileMap.ShowTemporaryTile(activeCoords, FloorGroup.WalkwayOnGrass);
+
+                switch (tool)
+                {
+                    case ToolSelection.Road:
+                        tileMap.ShowTemporaryTile(activeCoords, FloorGroup.WalkwayOnGrass);
+                        break;
+                    case ToolSelection.Tree:
+                        tileMap.ShowTemporaryModel(activeCoords, ItemType.Tree);
+                        break;
+                    case ToolSelection.Demolish:
+                        tileMap.ShowDemolishObjects(activeCoords, activeCoords);
+                        break;
+                }
             }
         }
 
@@ -99,12 +123,27 @@ public class MapInteractions : Script
         {
             Int2 tilePos = MouseTile();
             FloorGroup group = tileMap.TileGroupAt(tilePos);
-            if (group != FloorGroup.None && group != FloorGroup.WalkwayOnGrass)
+            if (group == FloorGroup.Grass)
             {
-                interaction = Interaction.TilePlacement;
-                activeCoords = tilePos;
-                placeTilesFlipped = false;
-                endCoords = new(-1, -1);
+                if (tool == ToolSelection.Road)
+                {
+                    interaction = Interaction.TilePlacement;
+                    activeCoords = tilePos;
+                    placeTilesFlipped = false;
+                    endCoords = new(-1, -1);
+                }
+                if (tool == ToolSelection.Tree)
+                {
+                    interaction = Interaction.TreePlacement;
+                    activeCoords = tilePos;
+                    tileMap.PlaceModel(activeCoords, ItemType.Tree);
+                }
+                if (tool == ToolSelection.Demolish)
+                {
+                    interaction = Interaction.Selecting;
+                    activeCoords = tilePos;
+                    tileMap.ShowDemolishObjects(activeCoords, activeCoords);
+                }
             }
         }
 
@@ -127,6 +166,16 @@ public class MapInteractions : Script
             Screen.CursorVisible = false;
         }
 
+        if (interaction == Interaction.None && Input.GetAction("SwitchBuild"))
+        {
+            tool++;
+            if (tool == ToolSelection.MaxValue)
+                tool = ToolSelection.Road;
+            tileMap.HideTemporaryModels();
+            tileMap.DeselectAll();
+            needsTileUpdate = true;
+            activeCoords.Y = -1;
+        }
 
         if (interaction != Interaction.None)
         {
@@ -183,7 +232,7 @@ public class MapInteractions : Script
                 else if (!Input.GetMouseButton(MouseButton.Left) || Input.GetMouseButtonDown(MouseButton.Right))
                 {
                     interaction = Interaction.None;
-                    tileMap.HideTemporaryTiles();
+                    tileMap.HideTemporaryModels();
                 }
                 else
                 {
@@ -197,6 +246,31 @@ public class MapInteractions : Script
                         tileMap.ShowTemporaryTileSpan(activeCoords, tilePos, FloorGroup.WalkwayOnGrass, placeTilesFlipped, flipReceived);
                     flipReceived = false;
                     endCoords = tilePos;
+                }
+            }
+
+            if (interaction == Interaction.TreePlacement)
+            {
+                if (Input.GetMouseButtonUp(MouseButton.Left) || !Input.GetMouseButton(MouseButton.Left))
+                {
+                    interaction = Interaction.None;
+                    needsTileUpdate = true;
+                }
+            }
+
+            if (interaction == Interaction.Selecting)
+            {
+                if (Input.GetMouseButtonUp(MouseButton.Left) || !Input.GetMouseButton(MouseButton.Left) || Input.GetMouseButtonDown(MouseButton.Right))
+                {
+                    tileMap.DeselectAll();
+                    interaction = Interaction.None;
+                    needsTileUpdate = true;
+                    activeCoords.Y = -1;
+                }
+                else
+                {
+                    Int2 tilePos = MouseTile();
+                    tileMap.ShowDemolishObjects(activeCoords, tilePos);
                 }
             }
         }

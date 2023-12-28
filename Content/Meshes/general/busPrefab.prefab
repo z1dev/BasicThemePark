@@ -1,0 +1,25 @@
+{
+	"ID": "11d5c5cd4678512285b90bb783997694",
+	"TypeName": "FlaxEngine.Prefab",
+	"EngineBuild": 6407,
+	"Data": [
+	{
+		"ID": "5322bba9497de55f30737a960e5029fd",
+		"TypeName": "FlaxEngine.AnimatedModel",
+		"Name": "bus",
+		"SkinnedModel": "d06e10284009f3cb06ab1a95a8cb42c2",
+		"AnimationGraph": "bc9d0361403ebc4f3e20d1b42b680d92",
+		"PerBoneMotionBlur": false,
+		"Buffer": {
+			"Entries": [
+				{
+					"Material": "00000000000000000000000000000000",
+					"ShadowsMode": 3,
+					"Visible": true,
+					"ReceiveDecals": true
+				}
+			]
+		}
+	}
+]
+}
