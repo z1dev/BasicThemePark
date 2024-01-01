@@ -45,6 +45,7 @@ public class TileMap : Script
     }
 
     public TileGenerator tileGenerator;
+    public MapNavigation mapNavigation;
     // Grid size of the starting map
     public Int2 MapSize = new(16, 16);
     // Grid X coordinates at the bottom of the map where the park can connect
@@ -57,15 +58,17 @@ public class TileMap : Script
     public Model wallModel;
 
     public Model treeModel;
-    public MaterialBase treeMaterial;
-
-    public Color placementColor;
-    public Color destructColor;
 
     public Model entranceModel;
 
     public Model sidewalkModel;
     public Model[] busLaneModels;
+
+    public MaterialBase treeMaterial;
+
+    public Color placementColor;
+    public Color destructColor;
+
 
     // Group and floor type pairing for each map cell position.
     private FloorData[] mapData;
@@ -112,6 +115,8 @@ public class TileMap : Script
         deselectionMaterials = [];
 
         GenerateMap();
+
+        mapNavigation.SetMapSize(MapSize);
     }
     
     /// <inheritdoc/>
@@ -156,12 +161,12 @@ public class TileMap : Script
         return mapData[TileIndex(pos_x, pos_y)].group;
     }
 
-    public (FloorGroup, FloorType) TileAt(Int2 tilePos)
+    public (FloorGroup group, FloorType ftype) TileAt(Int2 tilePos)
     {
         return TileAt(tilePos.X, tilePos.Y);
     }
 
-    public (FloorGroup, FloorType) TileAt(int pos_x, int pos_y)
+    public (FloorGroup group, FloorType ftype) TileAt(int pos_x, int pos_y)
     {
         var index = TileIndex(pos_x, pos_y);
         if (index < 0)
@@ -183,27 +188,41 @@ public class TileMap : Script
         return itemMap[index].mtype;
     }
 
-    public void PlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped = false)
+    // Returns the world coordinates of the area with tile grid position posA and posB at its corners.
+    public Rectangle GetTileRect(Int2 posA, Int2 posB)
     {
-        InnerPlaceTileSpan(posA, posB, group, flipped, false, false);
+        posA.X =  Math.Clamp(posA.X, 0, MapSize.X - 1);
+        posA.Y =  Math.Clamp(posA.Y, 0, MapSize.Y - 1);
+        posB.X =  Math.Clamp(posB.X, 0, MapSize.X - 1);
+        posB.Y =  Math.Clamp(posB.Y, 0, MapSize.Y - 1);
+
+        var tileDim = tileGenerator.TileDimension;
+
+        return new Rectangle(Mathf.Min(posA.X, posB.X) * tileDim, Mathf.Min(posA.Y, posB.Y) * tileDim, 
+            (Math.Max(posA.X, posB.X) - Math.Min(posA.X, posB.X) + 1) * tileDim, (Math.Max(posA.Y, posB.Y) - Math.Min(posA.Y, posB.Y) + 1) * tileDim);
     }
 
-    public void ShowTemporaryTile(Int2 tilePos, FloorGroup group)
+    public bool PlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped = false)
     {
-        InnerPlaceTileSpan(tilePos, tilePos, group, false, true, false);
+        return InnerPlaceTileSpan(posA, posB, group, flipped, false, false) > 0;
+    }
+
+    public bool ShowTemporaryTile(Int2 tilePos, FloorGroup group)
+    {
+        return InnerPlaceTileSpan(tilePos, tilePos, group, false, true, false) > 0;
     }
 
     // Shows one or multiple temporary tiles to demonstrate the effect of placing something on the map.
     // Nothing is shown if the starting position is invalid.
-    public void ShowTemporaryTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool forceUpdate)
+    public int ShowTemporaryTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool forceUpdate)
     {
-        InnerPlaceTileSpan(posA, posB, group, flipped, true, forceUpdate);
+        return InnerPlaceTileSpan(posA, posB, group, flipped, true, forceUpdate);
     }
 
-    public void ShowTemporaryModel(Int2 tilePos, ItemType mtype)
+    public bool ShowTemporaryModel(Int2 tilePos, ItemType mtype)
     {
         if (tempPosition.A == tilePos && tempItemType == mtype)
-            return;
+            return false;
 
         tempPosition.A = tilePos;
         tempItemType = mtype;
@@ -211,7 +230,7 @@ public class TileMap : Script
         HideTemporaryModels();
 
         if (TileGroupAt(tilePos) != FloorGroup.Grass || ItemTypeAt(tilePos) != ItemType.None)
-            return;
+            return false;
 
         StaticModel smodel;
         if (!itemModels.TryGetValue(mtype, out smodel))
@@ -228,6 +247,8 @@ public class TileMap : Script
         smodel.Position = new(tilePos.X * tileDim, 0.0, tilePos.Y * tileDim);
         smodel.IsActive = true;
         tempItem = smodel;
+
+        return true;
     }
 
     public void PlaceModel(Int2 tilePos, ItemType mtype)
@@ -259,7 +280,7 @@ public class TileMap : Script
 
         selectionMode = SelectionMode.Demolish;
         
-        if (index < 0 /*|| (itemMap[index].mtype == ItemType.None && (mapData[index].group == FloorGroup.None || mapData[index].group == FloorGroup.Grass))*/)
+        if (index < 0)
         {
             DeselectAll();
             return;
@@ -287,6 +308,78 @@ public class TileMap : Script
             }
         }
         UpdateSelectionModels(newSelection);
+    }
+
+    public void DemolishObjects(Int2 posA, Int2 posB)
+    {
+        HideTemporaryModels();
+        DeselectAll();
+
+        if (posB.X < posA.X)
+            (posB.X, posA.X) = (posA.X, posB.X);
+        if (posB.Y < posA.Y)
+            (posB.Y, posA.Y) = (posA.Y, posB.Y);
+
+        if (!ValidPos(posA) || !ValidPos(posB))
+            return;
+        
+        CreateTemporaryMap(posA, posB);
+
+        // First pass, delete objects and mark tiles
+        for (int ix = posA.X; ix < posB.X + 1; ++ix)
+        {
+            for (int iy = posA.Y; iy < posB.Y + 1; ++iy)
+            {
+                var index = TileIndex(ix, iy);
+                if (itemMap[index].mtype != ItemType.None)
+                {
+                    itemMap[index].mtype = ItemType.None;
+                    if (itemMap[index].actor != null)
+                    {
+                        Destroy(ref itemMap[index].actor);
+                        itemMap[index].actor = null;
+                    }
+                }
+
+                if (mapData[index].group != FloorGroup.Grass)
+                    PlotOnTemporaryMap(ix, iy);
+            }
+        }
+
+        mapNavigation.BeginChange();
+        // Second pass, replace marked ground tiles with grass.
+        for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
+        {
+            Int2 tempPos = TempPosFromIndex(ix);
+            Int2 pos = TempToGlobal(tempPos);
+            if (tempMap[ix] == 0 || !ValidPos(pos))
+                continue;
+
+            if (tempMap[ix] == 2)
+            {
+                SetTile(pos, FloorGroup.Grass, FloorType.FullTile);
+                mapNavigation.RemovePath(pos);
+            }
+        }
+        mapNavigation.EndChange();
+
+        // Third pass, update surrounding tiles
+        for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
+        {
+            Int2 tempPos = TempPosFromIndex(ix);
+            Int2 pos = TempToGlobal(tempPos);
+            if (tempMap[ix] == 0 || !ValidPos(pos))
+                continue;
+
+            var group = TileAt(pos).group;
+            if (tempMap[ix] == 1 && group != FloorGroup.Grass)
+            {
+                FloorType ftype = FloorTypeForSides(TileSidesForPosition(pos, group));
+                if (TileAt(pos) != (group, ftype))
+                    SetTile(pos, group, ftype);
+            }
+        }
+        DestroyTemporaryMap();
     }
 
     public void DeselectAll()
@@ -344,12 +437,13 @@ public class TileMap : Script
         selectedModels = models ?? ([]);
     }
 
-    private void InnerPlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool temp, bool forceUpdate)
+    // Returns the number of tiles placed, or that would be placed with the given positions.
+    private int InnerPlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool temp, bool forceUpdate)
     {
          if (temp)
         {
             if (!forceUpdate && tempPosition == (posA, posB) && tempGroup == group)
-                return;
+                return 1;
 
             tempPosition = (posA, posB);
             tempGroup = group;
@@ -361,7 +455,7 @@ public class TileMap : Script
         bool invalidIndex = indexA < 0 || indexB < 0;
 
         if (invalidIndex || mapData[indexA].group == group || itemMap[indexA].mtype != ItemType.None)
-            return;
+            return 0;
 
         CreateTemporaryMap(posA, posB);
         
@@ -384,16 +478,25 @@ public class TileMap : Script
                     PlotOnTemporaryMap(x, posB.Y);
         }
 
-        for (int ix = 0, siz = tempMapSize.X * tempMapSize.Y; ix < siz; ++ix)
+        int tilesPlaced = 0; 
+
+        if (!temp)
+            mapNavigation.BeginChange();
+        for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
         {
-            Int2 tempPos = new(ix % tempMapSize.X, ix / tempMapSize.X);
-            Int2 pos = tempPos + tempMapOrigin;
-            if (tempMap[ix] == 0 || pos.X < 0 || pos.Y < 0 || pos.X >= MapSize.X || pos.Y >= MapSize.Y)
+            Int2 tempPos = TempPosFromIndex(ix);
+            Int2 pos = TempToGlobal(tempPos);
+            if (tempMap[ix] == 0 || !ValidPos(pos))
                 continue;
 
             if (tempMap[ix] == 2 || TileGroupAt(pos) == group)
             {
-                FloorType ftype = FloorTypeForSides(TileSidesForPosition(pos, group) | TempTileSidesForPosition(tempPos, group));
+                if (TileGroupAt(pos) != group)
+                {
+                    ++tilesPlaced;
+                    mapNavigation.AddPath(pos);
+                }
+                FloorType ftype = FloorTypeForSides(TileSidesForPosition(pos, group) | TempTileSidesForPosition(tempPos));
                 if (TileAt(pos) != (group, ftype))
                 {
                     if (temp)
@@ -403,8 +506,63 @@ public class TileMap : Script
                 }
             }
         }
+        if (!temp)
+            mapNavigation.EndChange();
 
         DestroyTemporaryMap();
+        return tilesPlaced;
+    }
+
+    private bool ValidPos(Int2 pos)
+    {
+        return ValidPos(pos.X, pos.Y);
+    }
+
+    private bool ValidPos(int x, int y)
+    {
+        return x >= 0 && y >= 0 && x < MapSize.X && y < MapSize.Y;
+    }
+
+    private bool ValidTempPos(Int2 pos)
+    {
+        return ValidTempPos(pos.X, pos.Y);
+    }
+
+    private bool ValidTempPos(int x, int y)
+    {
+        return x >= 0 && y >= 0 && x < tempMapSize.X && y < tempMapSize.Y;
+    }
+
+    private Int2 TempPosFromIndex(int ix)
+    {
+        return new(ix % tempMapSize.X, ix / tempMapSize.X);
+    }
+
+    private int TempMapCount()
+    {
+        return tempMapSize.X * tempMapSize.Y;
+    }
+
+    private Int2 TempToGlobal(Int2 pos)
+    {
+        var r = TempToGlobal(pos.X, pos.Y);
+        return new Int2(r.rx, r.ry);
+    }
+
+    private (int rx, int ry) TempToGlobal(int x, int y)
+    {
+        return (x + tempMapOrigin.X, y + tempMapOrigin.Y);
+    }
+
+    private Int2 GlobalToTemp(Int2 pos)
+    {
+        var r = GlobalToTemp(pos.X, pos.Y);
+        return new Int2(r.rx, r.ry);
+    }
+
+    private (int rx, int ry) GlobalToTemp(int x, int y)
+    {
+        return (x - tempMapOrigin.X, y - tempMapOrigin.Y);
     }
 
     private void CreateTemporaryMap(Int2 posA, Int2 posB)
@@ -414,12 +572,12 @@ public class TileMap : Script
         tempMap = new int[tempMapSize.X * tempMapSize.Y];
     }
 
+    // Mark grid cells at posX,posY (global position) for change, and cells around for update check.
     private void PlotOnTemporaryMap(int posX, int posY)
     {
         // No error checks. We assume the parameters always make sense.
 
-        posX -= tempMapOrigin.X;
-        posY -= tempMapOrigin.Y;
+        (posX, posY) = GlobalToTemp(posX, posY);
         tempMap[posX + posY * tempMapSize.X] = 2;
 
         tempMap[posX + posY * tempMapSize.X - 1] = Mathf.Max(1, tempMap[posX + posY * tempMapSize.X - 1]);
@@ -565,7 +723,7 @@ public class TileMap : Script
 
     private int TileIndex(int pos_x, int pos_y)
     {
-        if (pos_x < 0 || pos_y < 0 || pos_x >= MapSize.X || pos_y >= MapSize.Y)
+        if (!ValidPos(pos_x, pos_y))
             return -1;
 
         return pos_y * MapSize.X + pos_x;
@@ -589,7 +747,7 @@ public class TileMap : Script
 
     private TileSide TileSidesForPosition(int pos_x, int pos_y, FloorGroup group)
     {
-        if (pos_x < 0 || pos_y < 0 || pos_x >= MapSize.X || pos_y >= MapSize.Y)
+        if (!ValidPos(pos_x, pos_y))
             throw new Exception();
 
         TileSide result = TileSide.None;
@@ -627,9 +785,9 @@ public class TileMap : Script
         return result;
     }
 
-    private TileSide TempTileSidesForPosition(Int2 pos, FloorGroup group)
+    private TileSide TempTileSidesForPosition(Int2 pos)
     {
-        if (tempMap == null || pos.X < 0 || pos.Y < 0 || pos.X >= tempMapSize.X || pos.Y >= tempMapSize.Y)
+        if (tempMap == null || !ValidTempPos(pos))
             return TileSide.None;
 
         TileSide result = TileSide.None;
@@ -696,10 +854,8 @@ public class TileMap : Script
         var tileDim = tileGenerator.TileDimension;
         var tile = CreateTile(new Vector3(pos_x * tileDim, 0.0, pos_y * tileDim), group, ftype, false);
         var index = TileIndex(pos_x, pos_y);
-        //Destroy(Find<StaticModel>(ref mapMeshIds[index]));
         Destroy(ref mapMeshes[index]);
         mapData[index] = (group, ftype);
-        //mapMeshIds[index] = tile.ID;
         mapMeshes[index] = tile;
     }
 

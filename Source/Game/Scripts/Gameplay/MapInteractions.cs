@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Numerics;
 using FlaxEngine;
 using Scripts;
 
@@ -20,6 +18,16 @@ public class MapInteractions : Script
 
     public Camera camera = null;
     public TileMap tileMap = null;
+
+    public MaterialBase selectionDecalMaterial = null;
+
+    public Color placementDecalColor;
+    public Color placementDecalFillColor;
+    public Color invalidLocationDecalColor;
+    public Color invalidLocationDecalFillColor;
+
+    public Color destructionDecalColor;
+    public Color destructionDecalFillColor;
 
     private FlyCam flyCam = null;
 
@@ -62,12 +70,15 @@ public class MapInteractions : Script
     private Interaction interaction;
     private ToolSelection tool;
 
+    private Decal selectionDecal = null;
+
     /// <inheritdoc/>
     public override void OnStart()
     {
         flyCam = camera.GetScript<FlyCam>();
         if (flyCam != null)
             flyCam.MovedOrRotated += new EventHandler(CameraMovedOrRotated);
+        CreateSelectionDecal();
     }
 
     private void HandleMouseWheel(Float2 f2, float f)
@@ -91,6 +102,18 @@ public class MapInteractions : Script
         Input.MouseWheel -= HandleMouseWheel;
     }
 
+    public void CreateSelectionDecal()
+    {
+        if (selectionDecal != null)
+            return;
+
+        selectionDecal = Actor.AddChild<Decal>();
+        selectionDecal.Material = selectionDecalMaterial;
+        var mat = selectionDecal.CreateAndSetVirtualMaterialInstance();
+        mat.SetParameterValue("Width", 100);
+        mat.SetParameterValue("CornerRadius", 60);
+    }
+
     /// <inheritdoc/>
     public override void OnUpdate()
     {
@@ -107,13 +130,35 @@ public class MapInteractions : Script
                 switch (tool)
                 {
                     case ToolSelection.Road:
-                        tileMap.ShowTemporaryTile(activeCoords, FloorGroup.WalkwayOnGrass);
+                        if (!tileMap.ShowTemporaryTile(activeCoords, FloorGroup.WalkwayOnGrass))
+                        {
+                            selectionDecal.Material.SetParameterValue("BorderColor", invalidLocationDecalColor);
+                            selectionDecal.Material.SetParameterValue("FillColor", invalidLocationDecalFillColor);
+                            ShowSelectionDecal(activeCoords, activeCoords);
+                        }
+                        else
+                        {
+                            HideSelectionDecal();
+                        }
                         break;
                     case ToolSelection.Tree:
-                        tileMap.ShowTemporaryModel(activeCoords, ItemType.Tree);
+                        if (tileMap.ShowTemporaryModel(activeCoords, ItemType.Tree))
+                        {
+                            selectionDecal.Material.SetParameterValue("BorderColor", placementDecalColor);
+                            selectionDecal.Material.SetParameterValue("FillColor", placementDecalFillColor);
+                        }
+                        else
+                        {
+                            selectionDecal.Material.SetParameterValue("BorderColor", invalidLocationDecalColor);
+                            selectionDecal.Material.SetParameterValue("FillColor", invalidLocationDecalFillColor);
+                        }
+                        ShowSelectionDecal(activeCoords, activeCoords);
                         break;
                     case ToolSelection.Demolish:
+                        selectionDecal.Material.SetParameterValue("BorderColor", destructionDecalColor);
+                        selectionDecal.Material.SetParameterValue("FillColor", destructionDecalFillColor);
                         tileMap.ShowDemolishObjects(activeCoords, activeCoords);
+                        ShowSelectionDecal(activeCoords, activeCoords);
                         break;
                 }
             }
@@ -138,12 +183,13 @@ public class MapInteractions : Script
                     activeCoords = tilePos;
                     tileMap.PlaceModel(activeCoords, ItemType.Tree);
                 }
-                if (tool == ToolSelection.Demolish)
-                {
-                    interaction = Interaction.Selecting;
-                    activeCoords = tilePos;
-                    tileMap.ShowDemolishObjects(activeCoords, activeCoords);
-                }
+            }
+            if (tool == ToolSelection.Demolish)
+            {
+                interaction = Interaction.Selecting;
+                activeCoords = tilePos;
+                ShowSelectionDecal(activeCoords, activeCoords);
+                tileMap.ShowDemolishObjects(activeCoords, activeCoords);
             }
         }
 
@@ -171,6 +217,7 @@ public class MapInteractions : Script
             tool++;
             if (tool == ToolSelection.MaxValue)
                 tool = ToolSelection.Road;
+            HideSelectionDecal();
             tileMap.HideTemporaryModels();
             tileMap.DeselectAll();
             needsTileUpdate = true;
@@ -226,13 +273,15 @@ public class MapInteractions : Script
                     interaction = Interaction.None;
                     Int2 tilePos = MouseTile();
                     tileMap.PlaceTileSpan(activeCoords, tilePos, FloorGroup.WalkwayOnGrass, placeTilesFlipped);
-                    activeCoords = tilePos;
                     needsTileUpdate = true;
+                    activeCoords.Y = -1;
                 }
                 else if (!Input.GetMouseButton(MouseButton.Left) || Input.GetMouseButtonDown(MouseButton.Right))
                 {
                     interaction = Interaction.None;
                     tileMap.HideTemporaryModels();
+                    needsTileUpdate = true;
+                    activeCoords.Y = -1;
                 }
                 else
                 {
@@ -255,25 +304,61 @@ public class MapInteractions : Script
                 {
                     interaction = Interaction.None;
                     needsTileUpdate = true;
+                    activeCoords.Y = -1;            
                 }
             }
 
             if (interaction == Interaction.Selecting)
             {
-                if (Input.GetMouseButtonUp(MouseButton.Left) || !Input.GetMouseButton(MouseButton.Left) || Input.GetMouseButtonDown(MouseButton.Right))
+                var execute = Input.GetMouseButtonUp(MouseButton.Left);
+                if (execute || !Input.GetMouseButton(MouseButton.Left) || Input.GetMouseButtonDown(MouseButton.Right))
                 {
+                    //HideSelectionDecal();
                     tileMap.DeselectAll();
                     interaction = Interaction.None;
+
+                    if (execute)
+                    {
+                        Int2 tilePos = MouseTile();
+                        if (tilePos.X >= 0 && tilePos.Y >= 0)
+                            tileMap.DemolishObjects(activeCoords, tilePos);
+                    }
                     needsTileUpdate = true;
                     activeCoords.Y = -1;
                 }
                 else
                 {
                     Int2 tilePos = MouseTile();
-                    tileMap.ShowDemolishObjects(activeCoords, tilePos);
+                    if (tilePos.X < 0 || tilePos.Y < 0)
+                    {
+                        HideSelectionDecal();
+                        tileMap.DeselectAll();
+                    }
+                    else
+                    {
+                        ShowSelectionDecal(activeCoords, tilePos);
+                        tileMap.ShowDemolishObjects(activeCoords, tilePos);
+                    }
                 }
             }
         }
+    }
+
+    private void ShowSelectionDecal(Int2 posA, Int2 posB)
+    {
+        Rectangle r = tileMap.GetTileRect(posA, posB);
+        selectionDecal.Material.SetParameterValue("DecalHalfSize", new Vector3(r.Width * 0.5f, 3000.0f, r.Height * 0.5f));
+        selectionDecal.Size = new Vector3(r.Width, 3000.0f, r.Height);
+        selectionDecal.Position = new Vector3(r.Left + r.Width * 0.5f, 1400.0f, r.Top + r.Height * 0.5f);
+        
+        selectionDecal.IsActive = true;
+    }
+
+    private void HideSelectionDecal()
+    {
+        if (selectionDecal == null)
+            return;
+        selectionDecal.IsActive = false;
     }
 
     private void CameraMovedOrRotated(object sender, EventArgs args)

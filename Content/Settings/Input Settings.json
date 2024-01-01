@@ -11,6 +11,14 @@
 			"MouseButton": 0,
 			"GamepadButton": 0,
 			"Gamepad": 0
+		},
+		{
+			"Name": "Cancel",
+			"Mode": 1,
+			"Key": 27,
+			"MouseButton": 0,
+			"GamepadButton": 0,
+			"Gamepad": 0
 		}
 	],
 	"AxisMappings": [

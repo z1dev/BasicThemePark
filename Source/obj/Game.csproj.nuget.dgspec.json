@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "g:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj": {}
+    "G:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj": {}
   },
   "projects": {
-    "g:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj": {
+    "G:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "g:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj",
+        "projectUniqueName": "G:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj",
         "projectName": "Game.CSharp",
-        "projectPath": "g:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj",
+        "projectPath": "G:\\Projects\\Flax\\BasicThemePark\\Source\\Game.csproj",
         "packagesPath": "C:\\Users\\John Smith\\.nuget\\packages\\",
-        "outputPath": "g:\\Projects\\Flax\\BasicThemePark\\Source\\obj\\",
+        "outputPath": "G:\\Projects\\Flax\\BasicThemePark\\Source\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

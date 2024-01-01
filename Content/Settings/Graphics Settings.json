@@ -4,12 +4,12 @@
 	"EngineBuild": 6407,
 	"Data": {
 	"UseVSync": false,
-	"AAQuality": 2,
-	"SSRQuality": 2,
-	"SSAOQuality": 2,
+	"AAQuality": 1,
+	"SSRQuality": 1,
+	"SSAOQuality": 1,
 	"VolumetricFogQuality": 2,
-	"ShadowsQuality": 2,
-	"ShadowMapsQuality": 2,
+	"ShadowsQuality": 1,
+	"ShadowMapsQuality": 1,
 	"AllowCSMBlending": false,
 	"DefaultProbeResolution": 128,
 	"UseHDRProbes": false,
@@ -44,21 +44,21 @@
 			}
 		},
 		"Bloom": {
-			"OverrideFlags": 0,
-			"Enabled": true,
+			"OverrideFlags": 1,
+			"Enabled": false,
 			"Intensity": 1.0,
 			"Threshold": 3.0,
 			"BlurSigma": 4.0,
 			"Limit": 10.0
 		},
 		"ToneMapping": {
-			"OverrideFlags": 1,
+			"OverrideFlags": 5,
 			"WhiteTemperature": 7000.0,
 			"WhiteTint": 0.0,
-			"Mode": 2
+			"Mode": 0
 		},
 		"ColorGrading": {
-			"OverrideFlags": 0,
+			"OverrideFlags": 18,
 			"ColorSaturation": {
 				"X": 1.0,
 				"Y": 1.0,
@@ -69,7 +69,7 @@
 				"X": 1.0,
 				"Y": 1.0,
 				"Z": 1.0,
-				"W": 1.0
+				"W": 0.94009995
 			},
 			"ColorGamma": {
 				"X": 1.0,
@@ -85,7 +85,7 @@
 			},
 			"ColorOffset": {
 				"X": 0.0,
-				"Y": 0.0,
+				"Y": -0.07,
 				"Z": 0.0,
 				"W": 0.0
 			},
@@ -197,8 +197,8 @@
 			"HistogramHighPercent": 98.0
 		},
 		"CameraArtifacts": {
-			"OverrideFlags": 0,
-			"VignetteIntensity": 0.8,
+			"OverrideFlags": 1,
+			"VignetteIntensity": 0.46,
 			"VignetteColor": {
 				"X": 0.0,
 				"Y": 0.0,

@@ -86,8 +86,11 @@
 				"B": 0.8745098114013672,
 				"A": 1.0
 			},
-			"Brightness": 4.0,
-			"ContactShadowsLength": 0.02500000037252903
+			"Brightness": 2.5,
+			"ShadowsDistance": 10000.0,
+			"ShadowsFadeDistance": 1000.0,
+			"ShadowsStrength": 0.6000000238418579,
+			"ShadowsDepthBias": 0.0020000000949949028
 		},
 		{
 			"ID": "5ee5628d425378acacb2dc8efe78aa33",
@@ -109,9 +112,9 @@
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
 			"Name": "SkyLight",
 			"Color": {
-				"R": 0.8274509906768799,
-				"G": 0.7882353067398071,
-				"B": 1.0,
+				"R": 0.9953538775444031,
+				"G": 1.0,
+				"B": 0.8359464406967163,
 				"A": 1.0
 			},
 			"Brightness": 2.5,
@@ -162,6 +165,7 @@
 			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
 			"V": {
 	"tileGenerator": "a6ada20e4d5dae961eb87b969dc8e846",
+	"mapNavigation": "b036027d48123a9ad5c0cabb4c474e79",
 	"MapSize": {
 		"X": 35,
 		"Y": 24
@@ -173,25 +177,25 @@
 	"TileMaterial": "70d5ac44462edc08012cacaec4193faa",
 	"wallModel": "b9bd7f23410709f122c4eab9b19d3e52",
 	"treeModel": "54cca28a41557ade907a73833c00b147",
-	"treeMaterial": "507746d94f60695036ab5da258d577ed",
-	"placementColor": {
-		"R": 0.0,
-		"G": 0.4,
-		"B": 1.0,
-		"A": 1.0
-	},
-	"destructColor": {
-		"R": 0.95555556,
-		"G": 0.09496592,
-		"B": 0.1253893,
-		"A": 1.0
-	},
 	"entranceModel": "60610fa442e4cfbd70fe4ca567ebf54a",
 	"sidewalkModel": "88a2b16b404553659bc6b4b531da896b",
 	"busLaneModels": [
 		"8d64aac8463c45cf2f3c0a9dd5c39795",
 		"291e76204404bc2c074472a749aa9ab7"
-	]
+	],
+	"treeMaterial": "507746d94f60695036ab5da258d577ed",
+	"placementColor": {
+		"R": 0.0,
+		"G": 0.20888893,
+		"B": 0.5222222,
+		"A": 1.0
+	},
+	"destructColor": {
+		"R": 0.24444443,
+		"G": 0.024293635,
+		"B": 0.03207636,
+		"A": 1.0
+	}
 }
 		},
 		{
@@ -200,8 +204,51 @@
 			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
 			"V": {
 	"camera": "968f6b544a46a590b2201ab25fd10387",
-	"tileMap": "f08465ce4d2b89c1c5f79b896d48f0cb"
+	"tileMap": "f08465ce4d2b89c1c5f79b896d48f0cb",
+	"selectionDecalMaterial": "156a9b5749420e0220d4bfb1c213a3dc",
+	"placementDecalColor": {
+		"R": 0.0,
+		"G": 0.7925825,
+		"B": 1.0,
+		"A": 1.0
+	},
+	"placementDecalFillColor": {
+		"R": 0.80980843,
+		"G": 0.97873074,
+		"B": 1.0,
+		"A": 0.0
+	},
+	"invalidLocationDecalColor": {
+		"R": 1.0,
+		"G": 1.0,
+		"B": 1.0,
+		"A": 0.46666664
+	},
+	"invalidLocationDecalFillColor": {
+		"R": 1.0,
+		"G": 1.0,
+		"B": 1.0,
+		"A": 0.23888886
+	},
+	"destructionDecalColor": {
+		"R": 1.0,
+		"G": 0.0,
+		"B": 0.037428856,
+		"A": 0.5
+	},
+	"destructionDecalFillColor": {
+		"R": 1.0,
+		"G": 0.23301136,
+		"B": 0.2542346,
+		"A": 0.23888886
+	}
 }
+		},
+		{
+			"ID": "b036027d48123a9ad5c0cabb4c474e79",
+			"TypeName": "Game.MapNavigation",
+			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
+			"V": {}
 		}
 	]
 }
