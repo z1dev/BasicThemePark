@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using FlaxEngine;
 
-namespace Scripts;
+namespace Game;
 
 /// <summary>
 /// TileGenerator Script.
@@ -265,9 +265,12 @@ public class TileGenerator : Script
         public static implicit operator VertModifierWithAlign((TileSide i, ((TileOp op, int index)[] v1, (TileOp op, int index)[] v2) m) t) => new(t.i, t.m.v1, t.m.v2);
     }
 
+    // Size of the texture for ground tiles.
     public Int2 TextureSize = new();
+    // Pixel size of tiles on the texture
     public Int2 TileSize = new();
-    public float TileDimension = 200.0f;
+    // Dimensions of a single tile in 3d units.
+    //public float TileDimension = 200.0f;
 
     private readonly Dictionary<FloorGroup, Dictionary<FloorType, Model>> FloorModels = [];
 
@@ -530,8 +533,8 @@ public class TileGenerator : Script
 
                 for (int ix = 0, siz = tileData.verts.Length; ix < siz; ++ix)
                 {
-                    verts[vertpos + ix].X += TileDimension * posX;
-                    verts[vertpos + ix].Z += TileDimension * posY;
+                    verts[vertpos + ix].X += TileGlobals.TileDimension * posX;
+                    verts[vertpos + ix].Z += TileGlobals.TileDimension * posY;
                 }
 
                 for (int ix = 0, siz = tileData.indexes.Length; ix < siz; ++ix)
@@ -769,9 +772,9 @@ public class TileGenerator : Script
             {
                 verts = [
                     new Float3(0.0f, 0.0f, 0.0f),
-                    new Float3(TileDimension, 0.0f, 0.0f),
-                    new Float3(0.0f, 0.0f, TileDimension),
-                    new Float3(TileDimension, 0.0f, TileDimension)
+                    new Float3(TileGlobals.TileDimension, 0.0f, 0.0f),
+                    new Float3(0.0f, 0.0f, TileGlobals.TileDimension),
+                    new Float3(TileGlobals.TileDimension, 0.0f, TileGlobals.TileDimension)
                 ];
                 uvs = [.. BuildUVArrayFromData(group, TexType.FullTile)];
                 indexes = [ 0, 1, 2, 1, 3, 2 ];
@@ -1867,7 +1870,7 @@ public class TileGenerator : Script
             // The data was generated for a different engine originally, which has a reverse Z direction to Flax.
             var v = verts[ix];
             v.Z *= -1;
-            v.Z += TileDimension;
+            v.Z += TileGlobals.TileDimension;
             verts[ix] = v;
         }
     }
@@ -1889,9 +1892,9 @@ public class TileGenerator : Script
         Rectangle r = FloorUVData[group][ttype];
         data.verts.AddRange([
             new Float3(0.0f, 0.0f, 0.0f),
-            new Float3(r.Size.X / TileSize.X * TileDimension, 0.0f, 0.0f),
-            new Float3(0.0f, 0.0f, r.Size.Y / TileSize.Y * TileDimension),
-            new Float3(r.Size.X / TileSize.X * TileDimension, 0.0f, r.Size.Y / TileSize.Y * TileDimension)
+            new Float3(r.Size.X / TileSize.X * TileGlobals.TileDimension, 0.0f, 0.0f),
+            new Float3(0.0f, 0.0f, r.Size.Y / TileSize.Y * TileGlobals.TileDimension),
+            new Float3(r.Size.X / TileSize.X * TileGlobals.TileDimension, 0.0f, r.Size.Y / TileSize.Y * TileGlobals.TileDimension)
         ]);
         data.uvs.AddRange(BuildUVArrayFromData(group, ttype));
         return data;
@@ -1961,15 +1964,15 @@ public class TileGenerator : Script
                     uv = basePos / new Float2(TextureSize.X, TextureSize.Y);
                     break;
                 case TileSide.TopRight:
-                    v = new Float3(baseSize.X / (float)TileSize.X, 0.0f, 0.0f) * TileDimension;
+                    v = new Float3(baseSize.X / (float)TileSize.X, 0.0f, 0.0f) * TileGlobals.TileDimension;
                     uv = new Float2(basePos.X + baseSize.X, basePos.Y) / new Float2(TextureSize.X, TextureSize.Y);
                     break;
                 case TileSide.BottomLeft:
-                    v = new Float3(0.0f, 0.0f, baseSize.Y / (float)TileSize.Y) * TileDimension;
+                    v = new Float3(0.0f, 0.0f, baseSize.Y / (float)TileSize.Y) * TileGlobals.TileDimension;
                     uv = new Float2(basePos.X, basePos.Y + baseSize.Y) / new Float2(TextureSize.X, TextureSize.Y);
                     break;
                 default:
-                    v = new Float3(baseSize.X / (float)TileSize.X, 0.0f, baseSize.Y / (float)TileSize.Y) * TileDimension;
+                    v = new Float3(baseSize.X / (float)TileSize.X, 0.0f, baseSize.Y / (float)TileSize.Y) * TileGlobals.TileDimension;
                     uv = new Float2(basePos.X + baseSize.X, basePos.Y + baseSize.Y) / new Float2(TextureSize.X, TextureSize.Y);
                     break;
             }
@@ -1981,13 +1984,13 @@ public class TileGenerator : Script
                     if (t.op == TileOp.Add)
                     {
                         var r = rects[t.index];
-                        v.X += r.Size.X * TileDimension / (float)TileSize.X;
+                        v.X += r.Size.X * TileGlobals.TileDimension / (float)TileSize.X;
                         uv.X += r.Size.X / (float)TextureSize.X;
                     }
                     else if (t.op == TileOp.Sub)
                     {
                         var r = rects[t.index];
-                        v.X -= r.Size.X * TileDimension / (float)TileSize.X;
+                        v.X -= r.Size.X * TileGlobals.TileDimension / (float)TileSize.X;
                         uv.X -= r.Size.X / (float)TextureSize.X;
                     }
                 }
@@ -2000,13 +2003,13 @@ public class TileGenerator : Script
                     if (t.op == TileOp.Add)
                     {
                         var r = rects[t.index];
-                        v.Z += r.Size.Y * TileDimension / (float)TileSize.Y;
+                        v.Z += r.Size.Y * TileGlobals.TileDimension / (float)TileSize.Y;
                         uv.Y += r.Size.Y / (float)TextureSize.Y;
                     }
                     else if (t.op == TileOp.Sub)
                     {
                         var r = rects[t.index];
-                        v.Z -= r.Size.Y * TileDimension / (float)TileSize.Y;
+                        v.Z -= r.Size.Y * TileGlobals.TileDimension / (float)TileSize.Y;
                         uv.Y -= r.Size.Y / (float)TextureSize.Y;
                     }
                 }
@@ -2031,9 +2034,9 @@ public class TileGenerator : Script
                 outVerts[ix].X -= bounds.Location.X;
         }
 
-        if (Mathf.Abs(bounds.Location.X + bounds.Width - TileDimension) > 0.1e-6 && (side == TileSide.Right || side == TileSide.TopRight || side == TileSide.BottomRight))
+        if (Mathf.Abs(bounds.Location.X + bounds.Width - TileGlobals.TileDimension) > 0.1e-6 && (side == TileSide.Right || side == TileSide.TopRight || side == TileSide.BottomRight))
         {
-            var dif = TileDimension - (bounds.Location.X + bounds.Width);
+            var dif = TileGlobals.TileDimension - (bounds.Location.X + bounds.Width);
             for (int ix = arrayIndex, siz = outVerts.Length; ix < siz; ++ix)
                 outVerts[ix].X += dif;
         }
@@ -2044,9 +2047,9 @@ public class TileGenerator : Script
                 outVerts[ix].Z -= bounds.Location.Y;
         }
 
-        if (Mathf.Abs(bounds.Location.Y + bounds.Height - TileDimension) > 0.1e-6 && (side == TileSide.Bottom || side == TileSide.BottomLeft || side == TileSide.BottomRight))
+        if (Mathf.Abs(bounds.Location.Y + bounds.Height - TileGlobals.TileDimension) > 0.1e-6 && (side == TileSide.Bottom || side == TileSide.BottomLeft || side == TileSide.BottomRight))
         {
-            var dif = TileDimension - (bounds.Location.Y + bounds.Height);
+            var dif = TileGlobals.TileDimension - (bounds.Location.Y + bounds.Height);
             for (int ix = arrayIndex, siz = outVerts.Length; ix < siz; ++ix)
                 outVerts[ix].Z += dif;
         }
@@ -2078,9 +2081,9 @@ public class TileGenerator : Script
     // Calculates the bounding rectangle of a mesh of two triangles.
     private Rectangle CalculateRectBounds(Float3[] verts)
     {
-        float minX = TileDimension;
+        float minX = TileGlobals.TileDimension;
         float maxX = 0.0f;
-        float minY = TileDimension;
+        float minY = TileGlobals.TileDimension;
         float maxY = 0.0f;
         foreach (Float3 v in verts)
         {
@@ -2095,9 +2098,9 @@ public class TileGenerator : Script
     // Calculates the bounding rectangle of a mesh of two triangles.
     private Rectangle CalculateRectBounds(List<Float3> verts)
     {
-        float minX = TileDimension;
+        float minX = TileGlobals.TileDimension;
         float maxX = 0.0f;
-        float minY = TileDimension;
+        float minY = TileGlobals.TileDimension;
         float maxY = 0.0f;
         foreach (Float3 v in verts)
         {
@@ -2133,7 +2136,7 @@ public class TileGenerator : Script
         if (left is TileRectData l)
         {
             var siz = CalculateRectBounds(l.verts).Size.X;
-            var usiz = siz / TileDimension * TileSize.X / TextureSize.X;
+            var usiz = siz / TileGlobals.TileDimension * TileSize.X / TextureSize.X;
             UpdateV3InList(data.verts, 0, siz, 0.0f);
             UpdateV3InList(data.verts, 2, siz, 0.0f);
             UpdateV2InList(data.uvs, 0, usiz, 0.0f);
@@ -2146,7 +2149,7 @@ public class TileGenerator : Script
         if (right is TileRectData r)
         {
             var siz = CalculateRectBounds(r.verts).Size.X;
-            var usiz = siz / TileDimension * TileSize.X / TextureSize.X;
+            var usiz = siz / TileGlobals.TileDimension * TileSize.X / TextureSize.X;
             UpdateV3InList(data.verts, 1, -siz, 0.0f);
             UpdateV3InList(data.verts, 3, -siz, 0.0f);
             UpdateV2InList(data.uvs, 1, -usiz, 0.0f);
@@ -2159,7 +2162,7 @@ public class TileGenerator : Script
         if (top is TileRectData t)
         {
             var siz = CalculateRectBounds(t.verts).Size.Y;
-            var usiz = siz / TileDimension * TileSize.Y / TextureSize.Y;
+            var usiz = siz / TileGlobals.TileDimension * TileSize.Y / TextureSize.Y;
             UpdateV3InList(data.verts, 0, 0.0f, siz);
             UpdateV3InList(data.verts, 1, 0.0f, siz);
             UpdateV2InList(data.uvs, 0, 0.0f, usiz);
@@ -2172,7 +2175,7 @@ public class TileGenerator : Script
         if (bottom is TileRectData b)
         {
             var siz = CalculateRectBounds(b.verts).Size.Y;
-            var usiz = siz / TileDimension * TileSize.Y / TextureSize.Y;
+            var usiz = siz / TileGlobals.TileDimension * TileSize.Y / TextureSize.Y;
             UpdateV3InList(data.verts, 2, 0.0f, -siz);
             UpdateV3InList(data.verts, 3, 0.0f, -siz);
             UpdateV2InList(data.uvs, 2, 0.0f, -usiz);

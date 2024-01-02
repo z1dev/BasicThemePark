@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using FlaxEngine;
-using FlaxEngine.Utilities;
-using Scripts;
 
 namespace Game;
 
@@ -70,6 +66,8 @@ public class TileMap : Script
     public Color destructColor;
 
 
+    private float TileDim = 0.0f;
+
     // Group and floor type pairing for each map cell position.
     private FloorData[] mapData;
     // ID of meshes placed at each map cell position.
@@ -104,6 +102,7 @@ public class TileMap : Script
     /// <inheritdoc/>
     public override void OnStart()
     {
+        TileDim = TileGlobals.TileDimension;
         tilePlacementMaterial = TileMaterial.CreateVirtualInstance();
         tilePlacementMaterial.SetParameterValue("EmissiveColor", placementColor);
 
@@ -114,9 +113,13 @@ public class TileMap : Script
         selectionMaterials = [];
         deselectionMaterials = [];
 
+
+        MapGlobals.EntryTiles = new int[EntryTiles.Length];
+        EntryTiles.CopyTo(MapGlobals.EntryTiles, 0);
+
         GenerateMap();
 
-        mapNavigation.SetMapSize(MapSize);
+        mapNavigation.SetMapData(MapSize);
     }
     
     /// <inheritdoc/>
@@ -139,12 +142,11 @@ public class TileMap : Script
 
     public Int2 FindTilePosition(Ray ray)
     {
-        var tileDim = tileGenerator.TileDimension;
         var hit = ray.GetPoint(ray.Position.Y / -ray.Direction.Y);
-        if (hit.X < 0 || hit.Z < 0 || hit.X > MapSize.X * tileDim || hit.Z > MapSize.Y * tileDim)
+        if (hit.X < 0 || hit.Z < 0 || hit.X > MapSize.X * TileDim || hit.Z > MapSize.Y * TileDim)
             return new Int2(-1, -1);
 
-        return new Int2((int)(hit.X / tileDim), (int)(hit.Z / tileDim));
+        return new Int2((int)(hit.X / TileDim), (int)(hit.Z / TileDim));
     }
 
     public FloorGroup TileGroupAt(Int2 tilePos)
@@ -196,10 +198,8 @@ public class TileMap : Script
         posB.X =  Math.Clamp(posB.X, 0, MapSize.X - 1);
         posB.Y =  Math.Clamp(posB.Y, 0, MapSize.Y - 1);
 
-        var tileDim = tileGenerator.TileDimension;
-
-        return new Rectangle(Mathf.Min(posA.X, posB.X) * tileDim, Mathf.Min(posA.Y, posB.Y) * tileDim, 
-            (Math.Max(posA.X, posB.X) - Math.Min(posA.X, posB.X) + 1) * tileDim, (Math.Max(posA.Y, posB.Y) - Math.Min(posA.Y, posB.Y) + 1) * tileDim);
+        return new Rectangle(Mathf.Min(posA.X, posB.X) * TileDim, Mathf.Min(posA.Y, posB.Y) * TileDim, 
+            (Math.Max(posA.X, posB.X) - Math.Min(posA.X, posB.X) + 1) * TileDim, (Math.Max(posA.Y, posB.Y) - Math.Min(posA.Y, posB.Y) + 1) * TileDim);
     }
 
     public bool PlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped = false)
@@ -243,8 +243,7 @@ public class TileMap : Script
             itemModels[mtype] = smodel;
             smodel.SetParent(Actor, false);
         }
-        var tileDim = tileGenerator.TileDimension;
-        smodel.Position = new(tilePos.X * tileDim, 0.0, tilePos.Y * tileDim);
+        smodel.Position = new(tilePos.X * TileDim, 0.0, tilePos.Y * TileDim);
         smodel.IsActive = true;
         tempItem = smodel;
 
@@ -262,10 +261,9 @@ public class TileMap : Script
 
         HideTemporaryModels();
 
-        var tileDim = tileGenerator.TileDimension;
         var smodel = Actor.AddChild<StaticModel>();
         smodel.Model = treeModel;
-        smodel.Position = new(tilePos.X * tileDim, 0.0, tilePos.Y * tileDim);
+        smodel.Position = new(tilePos.X * TileDim, 0.0, tilePos.Y * TileDim);
         var index = TileIndex(tilePos);
         itemMap[index].mtype = mtype;
         itemMap[index].origin = tilePos;
@@ -494,7 +492,8 @@ public class TileMap : Script
                 if (TileGroupAt(pos) != group)
                 {
                     ++tilesPlaced;
-                    mapNavigation.AddPath(pos);
+                    if (!temp)
+                        mapNavigation.AddPath(pos);
                 }
                 FloorType ftype = FloorTypeForSides(TileSidesForPosition(pos, group) | TempTileSidesForPosition(tempPos));
                 if (TileAt(pos) != (group, ftype))
@@ -612,7 +611,6 @@ public class TileMap : Script
     // Creates the initial world with only grass tiles in MapSize grid dimensions.
     private void GenerateMap()
     {
-        var tileDim = tileGenerator.TileDimension;
         var grassTile = tileGenerator.GetModel(FloorGroup.Grass, FloorType.FullTile);
 
         mapData = new FloorData[MapSize.X * MapSize.Y];
@@ -623,7 +621,7 @@ public class TileMap : Script
 
         for (int ix = 0, siz = MapSize.X * MapSize.Y; ix < siz; ++ix)
         {
-            var tile = CreateTile(new Vector3(ix % MapSize.X * tileDim, 0.0, ix / MapSize.X * tileDim), grassTile);
+            var tile = CreateTile(new Vector3(ix % MapSize.X * TileDim, 0.0, ix / MapSize.X * TileDim), grassTile);
             mapData[ix] = (FloorGroup.Grass, FloorType.FullTile);
             //mapMeshIds[ix] = tile.ID;
             mapMeshes[ix] = tile;
@@ -649,54 +647,54 @@ public class TileMap : Script
         
         var ground = Actor.AddChild<StaticModel>();
         ground.Model = model;
-        ground.Position = new Vector3(0.0, 0.0, -tileDim * (extraHeight + skipHeight + endingHeight));
+        ground.Position = new Vector3(0.0, 0.0, -TileDim * (extraHeight + skipHeight + endingHeight));
         ground.SetMaterial(0, TileMaterial);
 
         if (EntryTiles.Length > 0)
         {
-            var wall1 = tileGenerator.CreateRowOfModel(wallModel, EntryTiles[0] - 1, 1, tileDim, 0.0f);
+            var wall1 = tileGenerator.CreateRowOfModel(wallModel, EntryTiles[0] - 1, 1, TileDim, 0.0f);
             if (wall1 != null)
             {
                 var wallModel = Actor.AddChild<StaticModel>();
                 wallModel.Model = wall1;
-                wallModel.Position = new Vector3(0.0, 0.0, -tileDim);
+                wallModel.Position = new Vector3(0.0, 0.0, -TileDim);
             }
-            var trees1 = tileGenerator.CreateRowOfModel(treeModel, EntryTiles[0] - 1, 1, tileDim, 0.0f);
+            var trees1 = tileGenerator.CreateRowOfModel(treeModel, EntryTiles[0] - 1, 1, TileDim, 0.0f);
             if (trees1 != null)
             {
                 var treesModel = Actor.AddChild<StaticModel>();
                 treesModel.Model = trees1;
-                treesModel.Position = new Vector3(0.0, 0.0, -tileDim * 2.0);
+                treesModel.Position = new Vector3(0.0, 0.0, -TileDim * 2.0);
             }
 
             int from = EntryTiles.Last() + 2;
-            var wall2 = tileGenerator.CreateRowOfModel(wallModel, MapSize.X - from, 1, tileDim, 0.0f);
+            var wall2 = tileGenerator.CreateRowOfModel(wallModel, MapSize.X - from, 1, TileDim, 0.0f);
             if (wall2 != null)
             {
                 var wallModel = Actor.AddChild<StaticModel>();
                 wallModel.Model = wall2;
-                wallModel.Position = new Vector3(from * tileDim, 0.0, -tileDim);
+                wallModel.Position = new Vector3(from * TileDim, 0.0, -TileDim);
             }
 
-            var trees2 = tileGenerator.CreateRowOfModel(treeModel, MapSize.X - from, 1, tileDim, 0.0f);
+            var trees2 = tileGenerator.CreateRowOfModel(treeModel, MapSize.X - from, 1, TileDim, 0.0f);
             if (trees2 != null)
             {
                 var treesModel = Actor.AddChild<StaticModel>();
                 treesModel.Model = trees2;
-                treesModel.Position = new Vector3(from * tileDim, 0.0, -tileDim * 2.0);
+                treesModel.Position = new Vector3(from * TileDim, 0.0, -TileDim * 2.0);
             }
         }
         var entrance = Actor.AddChild<StaticModel>();
         entrance.Model = entranceModel;
-        entrance.Position = new Vector3(MapSize.X * 0.5 * tileDim, 0.0, -tileDim);
+        entrance.Position = new Vector3(MapSize.X * 0.5 * TileDim, 0.0, -TileDim);
 
         // Two lanes of sidewalk.
-        var sidewalk = tileGenerator.CreateRowOfModel(sidewalkModel, MapSize.X, 2, tileDim, tileDim);
+        var sidewalk = tileGenerator.CreateRowOfModel(sidewalkModel, MapSize.X, 2, TileDim, TileDim);
         if (sidewalk != null)
         {
             var sidewalkActor = Actor.AddChild<StaticModel>();
             sidewalkActor.Model = sidewalk;
-            sidewalkActor.Position = new Vector3(0.0, 0.0, -tileDim * 6.0);
+            sidewalkActor.Position = new Vector3(0.0, 0.0, -TileDim * 6.0);
         }
 
         var laneModelIndexes = new int[MapSize.X];
@@ -704,14 +702,14 @@ public class TileMap : Script
         for (int ix = 0, siz = MapSize.X; ix < siz; ++ix)
         {
             laneModelIndexes[ix] = ix % busLaneModels.Length;
-            laneModelPositions[ix] = new Vector3(tileDim * ix, 0.0, 0.0);
+            laneModelPositions[ix] = new Vector3(TileDim * ix, 0.0, 0.0);
         }
         var busLane = tileGenerator.CreateCompoundModel(busLaneModels, laneModelIndexes, laneModelPositions);
         if (busLane != null)
         {
             var busLaneActor = Actor.AddChild<StaticModel>();
             busLaneActor.Model = busLane;
-            busLaneActor.Position = new Vector3(0.0, 0.0, -tileDim * 6.0);
+            busLaneActor.Position = new Vector3(0.0, 0.0, -TileDim * 6.0);
         }
 
     }
@@ -736,8 +734,7 @@ public class TileMap : Script
 
     private Vector3 TileCoords(int pos_x, int pos_y)
     {
-        var tileDim = tileGenerator.TileDimension;
-        return new Vector3(pos_x * tileDim, 0.0, pos_y * tileDim);
+        return new Vector3(pos_x * TileDim, 0.0, pos_y * TileDim);
     }
 
     private TileSide TileSidesForPosition(Int2 tilePos, FloorGroup group)
@@ -826,8 +823,7 @@ public class TileMap : Script
 
     private void CreateTemporaryTile(int pos_x, int pos_y, FloorGroup group, FloorType ftype, bool placement = false)
     {
-        var tileDim = tileGenerator.TileDimension;
-        tempTiles.Add(CreateTile(new Vector3(pos_x * tileDim, 0.1, pos_y * tileDim), group, ftype, placement));
+        tempTiles.Add(CreateTile(new Vector3(pos_x * TileDim, 0.1, pos_y * TileDim), group, ftype, placement));
     }
 
     private StaticModel CreateTile(Vector3 world_pos, FloorGroup group, FloorType ftype, bool placement = false)
@@ -851,8 +847,7 @@ public class TileMap : Script
 
     private void SetTile(int pos_x, int pos_y, FloorGroup group, FloorType ftype)
     {
-        var tileDim = tileGenerator.TileDimension;
-        var tile = CreateTile(new Vector3(pos_x * tileDim, 0.0, pos_y * tileDim), group, ftype, false);
+        var tile = CreateTile(new Vector3(pos_x * TileDim, 0.0, pos_y * TileDim), group, ftype, false);
         var index = TileIndex(pos_x, pos_y);
         Destroy(ref mapMeshes[index]);
         mapData[index] = (group, ftype);

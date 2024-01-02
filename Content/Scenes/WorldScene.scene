@@ -18,8 +18,17 @@
 			}
 		},
 		{
-			"ID": "a6ada20e4d5dae961eb87b969dc8e846",
-			"TypeName": "Scripts.TileGenerator",
+			"ID": "03e89e53448d945ab728fcb2f69c5286",
+			"TypeName": "Game.GlobalValues",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"V": {
+	"VisitorWalkingSpeed": 120.0,
+	"mapNavigation": "b036027d48123a9ad5c0cabb4c474e79"
+}
+		},
+		{
+			"ID": "e93aabe14066cf07f69771ba814d3ceb",
+			"TypeName": "Game.TileGenerator",
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
 			"V": {
 	"TextureSize": {
@@ -57,9 +66,10 @@
 			"Z": 1.0
 		}
 	},
-	"stopXPosition": 3600.0,
+	"doorOffset": 150.0,
 	"moveSpeed": 600.0,
-	"acceleration": 800.0
+	"acceleration": 800.0,
+	"visitorPrefab": "bdb5b220448b91273b6618a2985b4286"
 }
 		},
 		{
@@ -164,7 +174,7 @@
 			"TypeName": "Game.TileMap",
 			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
 			"V": {
-	"tileGenerator": "a6ada20e4d5dae961eb87b969dc8e846",
+	"tileGenerator": "e93aabe14066cf07f69771ba814d3ceb",
 	"mapNavigation": "b036027d48123a9ad5c0cabb4c474e79",
 	"MapSize": {
 		"X": 35,

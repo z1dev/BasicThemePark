@@ -1,6 +1,5 @@
 ﻿using System;
 using FlaxEngine;
-using Scripts;
 
 namespace Game;
 

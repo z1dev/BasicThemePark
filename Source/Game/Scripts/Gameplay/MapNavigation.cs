@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using FlaxEngine;
 
 namespace Game;
@@ -8,6 +10,14 @@ namespace Game;
 /// </summary>
 public class MapNavigation : Script
 {
+    public enum Direction
+    {
+        Up,
+        Down,
+        Left,
+        Right
+    }
+
     private enum CellType
     {
         // No path in cell.
@@ -28,6 +38,8 @@ public class MapNavigation : Script
         Straight,
         // A cell on the horizontal and a cell on the vertical side
         Turn,
+        // All three cells in one side are empty, every other one is not. Low probability of turning
+        Side,
     }
 
     private struct Cell
@@ -49,6 +61,7 @@ public class MapNavigation : Script
     // A list of path items that are changed and need their cell type updated. 
     private List<Int2> changes = [];
     private ChangeType changeType;
+    private bool changing = false;
 
 
     // /// <inheritdoc/>
@@ -76,7 +89,7 @@ public class MapNavigation : Script
     // }
 
     // Call it only at the creation of the map. Any other time and it causes undefined behavior.
-    public void SetMapSize(Int2 size)
+    public void SetMapData(Int2 size)
     {
         mapSize = size;
         if (mapSize.X > 0 && mapSize.Y > 0)
@@ -92,6 +105,12 @@ public class MapNavigation : Script
 
     public void AddPath(Int2 pos)
     {
+        if (!changing)
+        {
+            Debug.LogError("Trying to add to navigation when not in change.");
+            return;
+        }
+
         if (changeType == ChangeType.None)
             changeType = ChangeType.Adding;
         else if (changeType != ChangeType.Adding)
@@ -106,11 +125,19 @@ public class MapNavigation : Script
         if (index < 0)
             return;
         if (mapCells[index].ctype == CellType.Empty)
+        {
             changes.Add(pos);
+        }
     }
 
     public void RemovePath(Int2 pos)
     {
+        if (!changing)
+        {
+            Debug.LogError("Trying to remove to navigation when not in change.");
+            return;
+        }
+
         if (changeType == ChangeType.None)
             changeType = ChangeType.Removing;
         else if (changeType != ChangeType.Removing)
@@ -130,18 +157,22 @@ public class MapNavigation : Script
 
     public void BeginChange()
     {
+        if (changing)
+            Debug.LogError("Already changing navigation.");
+        changing = true;
     }
 
     public void EndChange()
     {
-        if (changes.Count == 0 || changeType == ChangeType.None || changeType == ChangeType.Invalid)
+        if (!changing || changes.Count == 0 || changeType == ChangeType.None || changeType == ChangeType.Invalid)
         {
+            if (!changing)
+                Debug.LogError("Can't end change when not changing navigation.");
+            changing = false;
             changes = [];
             changeType = ChangeType.None;
             return;
         }
-
-        changeType = ChangeType.None;
 
         foreach (var pos in changes)
         {
@@ -165,33 +196,224 @@ public class MapNavigation : Script
                 UpdateCellType(pos + dir, updated);
         }
 
+        changing = false;
+        changeType = ChangeType.None;
         changes = [];
+    }
+
+    public Int2 PickTile(Int2 pos, Direction dir)
+    {
+        if (pos.Y < 0)
+        {
+            var nextCell = ForwardFrom(pos, dir);
+            var index = CellIndex(nextCell);
+            // First time entering:
+            if (index == -1 || mapCells[index].ctype == CellType.Empty)
+                return pos;
+            return nextCell;
+        }
+
+        var cindex = CellIndex(pos);
+        CellType upCell = pos.Y >= mapSize.Y - 1 ? CellType.Empty : mapCells[cindex + mapSize.X].ctype;
+        CellType downCell = pos.Y == 0 ? CellType.Empty : mapCells[cindex - mapSize.X].ctype;
+        CellType leftCell = pos.X == 0 ? CellType.Empty : mapCells[cindex - 1].ctype;
+        CellType rightCell = pos.X >= mapSize.X - 1 ? CellType.Empty : mapCells[cindex + 1].ctype;
+
+        const float MIDDLE_TURN_PROBABILITY = 0.1f;
+        const float INNER_CORNER_TURN_PROBABILITY = 0.2f;
+        const float CROSSING_TURN_PROBABILITY = 0.25f;
+
+        //Debug.Log(mapCells[cindex].ctype);
+        switch (mapCells[cindex].ctype)
+        {
+            // Path cell on each side, including diagonals. Low probability of turning.
+            case CellType.Middle:
+                if (RandomUtil.Rand() < MIDDLE_TURN_PROBABILITY)
+                {
+                    var dirRng = RandomUtil.Rand();
+                    if (dirRng < 0.5f)
+                        return ForwardFrom(pos, TurnDirection(dir, Direction.Left));
+                    else
+                        return ForwardFrom(pos, TurnDirection(dir, Direction.Right));
+
+                }
+                break;
+            case CellType.Side:
+            {
+                var fwd = ForwardFrom(pos, dir);
+                var index = CellIndex(fwd);
+                if (index != -1 && mapCells[index].ctype != CellType.Empty && RandomUtil.Rand() < MIDDLE_TURN_PROBABILITY)
+                {
+                    var turned = ForwardFrom(pos, TurnDirection(dir, Direction.Left));
+                    index = CellIndex(turned);
+                    if (index > -1 && mapCells[index].ctype != CellType.Empty)
+                        return turned;
+                    turned = ForwardFrom(pos, TurnDirection(dir, Direction.Right));
+                    index = CellIndex(turned);
+                    if (index > -1 && mapCells[index].ctype != CellType.Empty)
+                        return turned;
+                }
+                break;
+            }
+            // Path cell on most sides, apart from non-crossing diagonals.
+            case CellType.InnerCorner:
+                if (RandomUtil.Rand() < INNER_CORNER_TURN_PROBABILITY)
+                {
+                    var dirRng = RandomUtil.Rand();
+                    if (dirRng < 0.5f)
+                    {
+                        var fwd = ForwardFrom(pos, TurnDirection(dir, Direction.Left));
+                        var fwdIndex = CellIndex(fwd);
+                        if (fwdIndex != -1 && mapCells[fwdIndex].ctype != CellType.Empty)
+                            return fwd;
+                    }
+                    else
+                    {
+                        var fwd = ForwardFrom(pos, TurnDirection(dir, Direction.Right));
+                        var fwdIndex = CellIndex(fwd);
+                        if (fwdIndex != -1 && mapCells[fwdIndex].ctype != CellType.Empty)
+                            return fwd;
+                    }
+
+                }
+                break;
+            case CellType.Turn:
+                goto case CellType.OuterCorner;
+            case CellType.OuterCorner:
+                if (leftCell != CellType.Empty && dir != Direction.Right)
+                    return ForwardFrom(pos, Direction.Left);
+                if (rightCell != CellType.Empty && dir != Direction.Left)
+                    return ForwardFrom(pos, Direction.Right);
+                if (upCell != CellType.Empty && dir != Direction.Down)
+                    return ForwardFrom(pos, Direction.Up);
+                return ForwardFrom(pos, Direction.Down);
+            // At least one path to a side with both neighboring diagonals missing.
+            case CellType.Crossing:
+                if (RandomUtil.Rand() < CROSSING_TURN_PROBABILITY)
+                {
+                    var turnCnt = 0;
+                    if (dir != Direction.Up && (downCell == CellType.Straight || downCell == CellType.DeadEnd))
+                        turnCnt++;
+                    if (dir != Direction.Left && (rightCell == CellType.Straight || rightCell == CellType.DeadEnd))
+                        turnCnt++;
+                    if (dir != Direction.Right && (leftCell == CellType.Straight || leftCell == CellType.DeadEnd))
+                        turnCnt++;
+                    if (dir != Direction.Down && (upCell == CellType.Straight || upCell == CellType.DeadEnd))
+                        turnCnt++;
+                    if (turnCnt != 0)
+                    {
+                        var turnSide = RandomUtil.Rand();
+                        if (dir != Direction.Up && (downCell == CellType.Straight || downCell == CellType.DeadEnd))
+                        {
+                            if (turnSide < (1.0f / turnCnt))
+                                return ForwardFrom(pos, Direction.Down);
+                            turnSide -= 1.0f / turnCnt;
+                        }
+                        if (dir != Direction.Left && (rightCell == CellType.Straight || rightCell == CellType.DeadEnd))
+                        {
+                            if (turnSide < (1.0f / turnCnt))
+                                return ForwardFrom(pos, Direction.Right);
+                            turnSide -= 1.0f / turnCnt;
+                        }
+                        if (dir != Direction.Right && (leftCell == CellType.Straight || leftCell == CellType.DeadEnd))
+                        {
+                            if (turnSide < (1.0f / turnCnt))
+                                return ForwardFrom(pos, Direction.Left);
+                            turnSide -= 1.0f / turnCnt;
+                        }
+                        return ForwardFrom(pos, Direction.Up);
+                    }
+                }
+                break;
+            case CellType.DeadEnd:
+            {
+                if (upCell != CellType.Empty)
+                    return ForwardFrom(pos, Direction.Up);
+                if (downCell != CellType.Empty)
+                    return ForwardFrom(pos, Direction.Down);
+                if (leftCell != CellType.Empty)
+                    return ForwardFrom(pos, Direction.Left);
+                if (rightCell != CellType.Empty)
+                    return ForwardFrom(pos, Direction.Right);
+                return pos;
+            }
+            case CellType.Isolated:
+                return pos;
+            // // Cell with two other cells to the sides. Either both horizontal or both vertical.
+            // default: // case CellType.Straight:
+            //     return ForwardFrom(pos, dir);
+        }
+        var nextPos = ForwardFrom(pos, dir);
+        var nextIndex = CellIndex(nextPos);
+        if (nextIndex == -1 || mapCells[nextIndex].ctype == CellType.Empty)
+        {
+            // Must turn left or right.
+            var leftPos = ForwardFrom(pos, TurnDirection(dir, Direction.Left));
+            var rightPos = ForwardFrom(pos, TurnDirection(dir, Direction.Right));
+            var leftEmpty = CellIndex(leftPos) == -1 || mapCells[CellIndex(leftPos)].ctype == CellType.Empty;
+            var rightEmpty = CellIndex(rightPos) == -1 || mapCells[CellIndex(rightPos)].ctype == CellType.Empty;
+            if (leftEmpty && !rightEmpty)
+                return rightPos;
+            if (rightEmpty && !leftEmpty)
+                return leftPos;
+            else if (!leftEmpty && !rightEmpty)
+                return RandomUtil.Rand() < 0.5 ? leftPos : rightPos;
+        }
+
+        return nextPos;
+    }
+
+    private Int2 ForwardFrom(Int2 pos, Direction dir)
+    {
+        switch(dir)
+        {
+            case Direction.Up:
+                return new Int2(pos.X, pos.Y + 1);
+            case Direction.Down:
+                return new Int2(pos.X, pos.Y - 1);
+            case Direction.Left:
+                return new Int2(pos.X - 1, pos.Y);
+            case Direction.Right:
+                return new Int2(pos.X + 1, pos.Y);
+        }
+        return pos;
+    }
+
+    private Direction TurnDirection(Direction orig, Direction side)
+    {
+        if (orig == Direction.Up)
+            return side;
+        if (orig == Direction.Left)
+            return side == Direction.Left ? Direction.Down : Direction.Up;
+        if (orig == Direction.Right)
+            return side == Direction.Left ? Direction.Up : Direction.Down;
+        return side == Direction.Left ? Direction.Right : Direction.Left;
     }
 
     private void UpdateCellType(Int2 pos, HashSet<Int2> updated)
     {
         if (!ValidPos(pos) || !updated.Add(pos))
             return;
-        
+
         var index = CellIndex(pos);
         if (mapCells[index].ctype == CellType.Empty)
             return;
 
         bool[,] sides = {
             {
-                pos.X == 0 || pos.Y == 0 || mapCells[index - mapSize.X - 1].ctype != CellType.Empty,
-                pos.X == 0 || mapCells[index - 1].ctype != CellType.Empty,
-                pos.X == 0 || pos.Y >= mapSize.Y - 1 || mapCells[index + mapSize.X - 1].ctype != CellType.Empty,
+                pos.X > 0 && pos.Y < mapSize.Y - 1 && mapCells[index + mapSize.X - 1].ctype != CellType.Empty,
+                pos.X > 0 && mapCells[index - 1].ctype != CellType.Empty,
+                pos.X > 0 && pos.Y > 0 && mapCells[index - mapSize.X - 1].ctype != CellType.Empty
             },
             {
-                pos.Y == 0 || mapCells[index - mapSize.X].ctype != CellType.Empty,
+                pos.Y < mapSize.Y - 1 && mapCells[index + mapSize.X].ctype != CellType.Empty,
                 true,
-                pos.Y >= mapSize.Y - 1 || mapCells[index + mapSize.X].ctype != CellType.Empty
+                pos.Y > 0 && mapCells[index - mapSize.X].ctype != CellType.Empty
             },
             {
-                pos.X >= mapSize.X - 1 || pos.Y == 0 || mapCells[index - mapSize.X + 1].ctype != CellType.Empty,
-                pos.X >= mapSize.X - 1 || mapCells[index + 1].ctype != CellType.Empty,
-                pos.X >= mapSize.X - 1 || pos.Y >= mapSize.Y - 1 || mapCells[index + mapSize.X + 1].ctype != CellType.Empty
+                pos.X < mapSize.X - 1 && pos.Y < mapSize.Y - 1 && mapCells[index + mapSize.X + 1].ctype != CellType.Empty,
+                pos.X < mapSize.X - 1 && mapCells[index + 1].ctype != CellType.Empty,
+                pos.X < mapSize.X - 1 && pos.Y > 0 && mapCells[index - mapSize.X + 1].ctype != CellType.Empty
             }
         };
         
@@ -210,7 +432,7 @@ public class MapNavigation : Script
             else if (horz == 1 || vert == 1)
                 mapCells[index].ctype = CellType.DeadEnd;
         }
-        else if (horz == 1 && vert == 1 && diagonals != 0)
+        else if (horz == 1 && vert == 1)
         {
             if ((sides[0, 0] && sides[0, 1] && sides[1, 0]) || (sides[2, 0] && sides[1, 0] && sides[2, 1]) ||
                     (sides[0, 2] && sides[0, 1] && sides[1, 2]) || (sides[2, 2] && sides[1, 2] && sides[2, 1]))
@@ -218,6 +440,10 @@ public class MapNavigation : Script
             else
                 mapCells[index].ctype = CellType.Turn;
         }
+        else if (horz + vert == 3 && diagonals == 2 && ((!sides[0, 0] && !sides[1, 0] && !sides[2, 0]) ||
+                (!sides[0, 0] && !sides[0, 1] && !sides[0, 2]) || (!sides[2, 0] && !sides[2, 1] && !sides[2, 2]) ||
+                (!sides[0, 2] && !sides[1, 2] && !sides[2, 2])))
+            mapCells[index].ctype = CellType.Side;
         else if ((!sides[0, 0] && !sides[2, 0]) || (!sides[0, 0] && !sides[0, 2]) || (!sides[2, 0] && !sides[2, 2]) || (!sides[0, 2] && !sides[2, 2]))
             mapCells[index].ctype = CellType.Crossing;
         else

@@ -20,7 +20,7 @@
     <AssemblyName>Game.CSharp</AssemblyName>
     <LangVersion>12.0</LangVersion>
     <FileAlignment>512</FileAlignment>
-    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)..\Cache\Projects\Flax.Build.CSharp.targets</CustomAfterMicrosoftCommonTargets>
+    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)..\Cache\Projects\Flax.Build.CSharp.SkipBuild.targets</CustomAfterMicrosoftCommonTargets>
     <RestorePackages>false</RestorePackages>
     <DisableFastUpToDateCheck>True</DisableFastUpToDateCheck>
   </PropertyGroup>
@@ -42,7 +42,7 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor.Windows.Debug|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -63,7 +63,7 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor.Windows.Debug|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -84,7 +84,7 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor.Windows.Development|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -105,7 +105,7 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Editor.Windows.Release|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -126,7 +126,7 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Game.Windows.Debug|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -147,7 +147,7 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Game.Windows.Development|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -168,14 +168,15 @@
   </PropertyGroup>
   <ItemGroup Condition=" '$(Configuration)|$(Platform)' == 'Game.Windows.Release|x64' ">
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\..\..\Flax\Flax_master\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\Github\FlaxEngine\Source\Platforms\DotNet\Newtonsoft.Json.dll</HintPath>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="FlaxEngine.CSharp">
-      <HintPath>..\..\..\..\Flax\Flax_master\Binaries\Editor\Win64\Development\FlaxEngine.CSharp.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\Cache\Projects\FlaxEngine.csproj">
+      <Project>{28DA4E72-117F-415C-9033-169DAE6E52AF}</Project>
+      <Name>FlaxEngine</Name>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -183,14 +184,16 @@
     <Compile Include="Game\Scripts\Gameplay\BusController.cs" />
     <Compile Include="Game\Scripts\Gameplay\MapInteractions.cs" />
     <Compile Include="Game\Scripts\Gameplay\MapNavigation.cs" />
+    <Compile Include="Game\Scripts\Gameplay\VisitorBehavior.cs" />
     <Compile Include="Game\Scripts\TileMap\TileGenerator.cs" />
     <Compile Include="Game\Scripts\TileMap\TileMap.cs" />
     <Compile Include="Game\Scripts\Util\FlyCam.cs" />
-    <Compile Visible="false" Include="G:\Projects\Flax\BasicThemePark\Cache\Intermediate\GameEditorTarget\Windows\x64\Debug\Game\Game.Bindings.Gen.cs" />
-    <Compile Visible="false" Include="G:\Projects\Flax\BasicThemePark\Cache\Intermediate\GameEditorTarget\Windows\x64\Development\Game\Game.Bindings.Gen.cs" />
-    <Compile Visible="false" Include="G:\Projects\Flax\BasicThemePark\Cache\Intermediate\GameEditorTarget\Windows\x64\Release\Game\Game.Bindings.Gen.cs" />
-    <Compile Visible="false" Include="G:\Projects\Flax\BasicThemePark\Cache\Intermediate\GameTarget\Windows\x64\Debug\Game\Game.Bindings.Gen.cs" />
-    <Compile Visible="false" Include="G:\Projects\Flax\BasicThemePark\Cache\Intermediate\GameTarget\Windows\x64\Development\Game\Game.Bindings.Gen.cs" />
-    <Compile Visible="false" Include="G:\Projects\Flax\BasicThemePark\Cache\Intermediate\GameTarget\Windows\x64\Release\Game\Game.Bindings.Gen.cs" />
+    <Compile Include="Game\Scripts\Util\GlobalValues.cs" />
+    <Compile Visible="false" Include="g:\projects\Flax\BasicThemePark\Cache\Intermediate\GameEditorTarget\Windows\x64\Debug\Game\Game.Bindings.Gen.cs" />
+    <Compile Visible="false" Include="g:\projects\Flax\BasicThemePark\Cache\Intermediate\GameEditorTarget\Windows\x64\Development\Game\Game.Bindings.Gen.cs" />
+    <Compile Visible="false" Include="g:\projects\Flax\BasicThemePark\Cache\Intermediate\GameEditorTarget\Windows\x64\Release\Game\Game.Bindings.Gen.cs" />
+    <Compile Visible="false" Include="g:\projects\Flax\BasicThemePark\Cache\Intermediate\GameTarget\Windows\x64\Debug\Game\Game.Bindings.Gen.cs" />
+    <Compile Visible="false" Include="g:\projects\Flax\BasicThemePark\Cache\Intermediate\GameTarget\Windows\x64\Development\Game\Game.Bindings.Gen.cs" />
+    <Compile Visible="false" Include="g:\projects\Flax\BasicThemePark\Cache\Intermediate\GameTarget\Windows\x64\Release\Game\Game.Bindings.Gen.cs" />
   </ItemGroup>
 </Project>

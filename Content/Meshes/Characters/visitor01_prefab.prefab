@@ -1,0 +1,43 @@
+{
+	"ID": "bdb5b220448b91273b6618a2985b4286",
+	"TypeName": "FlaxEngine.Prefab",
+	"EngineBuild": 6407,
+	"Data": [
+	{
+		"ID": "50272f234965bfef5507cc873eee2c72",
+		"TypeName": "FlaxEngine.AnimatedModel",
+		"Name": "visitor",
+		"StaticFlags": 0,
+		"SkinnedModel": "7d9e53de4e186adc30ad3d975bcd41de",
+		"AnimationGraph": "4aa1afe84a7729ec5931d2bd8bb0f382",
+		"Buffer": {
+			"Entries": [
+				{
+					"Material": "00000000000000000000000000000000",
+					"ShadowsMode": 3,
+					"Visible": true,
+					"ReceiveDecals": true
+				},
+				{
+					"Material": "00000000000000000000000000000000",
+					"ShadowsMode": 3,
+					"Visible": true,
+					"ReceiveDecals": true
+				},
+				{
+					"Material": "00000000000000000000000000000000",
+					"ShadowsMode": 3,
+					"Visible": true,
+					"ReceiveDecals": true
+				}
+			]
+		}
+	},
+	{
+		"ID": "857ffddd47490977ab1407aad7e07175",
+		"TypeName": "Game.VisitorBehavior",
+		"ParentID": "50272f234965bfef5507cc873eee2c72",
+		"V": {}
+	}
+]
+}
