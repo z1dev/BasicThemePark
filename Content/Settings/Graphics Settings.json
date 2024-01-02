@@ -251,7 +251,7 @@
 			"BokehDepthCutoff": 1.5
 		},
 		"MotionBlur": {
-			"OverrideFlags": 0,
+			"OverrideFlags": 1,
 			"Enabled": true,
 			"Scale": 1.0,
 			"SampleCount": 10,

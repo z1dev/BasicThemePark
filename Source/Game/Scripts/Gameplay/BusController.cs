@@ -38,7 +38,7 @@ public class BusController : Script
     private float stopTime = 0.0f;
     private float timeToFullStop = 0.0f;
 
-    private int visitorCount = 1;
+    private int visitorCount = 1000;
 
 
     /// <inheritdoc/>
