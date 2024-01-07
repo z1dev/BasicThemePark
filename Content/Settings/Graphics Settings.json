@@ -7,7 +7,7 @@
 	"AAQuality": 1,
 	"SSRQuality": 1,
 	"SSAOQuality": 1,
-	"VolumetricFogQuality": 2,
+	"VolumetricFogQuality": 1,
 	"ShadowsQuality": 1,
 	"ShadowMapsQuality": 1,
 	"AllowCSMBlending": false,

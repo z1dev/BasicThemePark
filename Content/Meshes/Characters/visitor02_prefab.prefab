@@ -24,7 +24,11 @@
 		"ID": "cf9d288146d5da58b557b09621bbf78c",
 		"TypeName": "Game.VisitorBehavior",
 		"ParentID": "17edccc24ba9254e016d30905221692f",
-		"V": {}
+		"V": {
+	"WalkingSpeed": 120.0,
+	"MaximumTurnRadius": 80.0,
+	"LaneSideDistance": 0.3
+}
 	}
 ]
 }

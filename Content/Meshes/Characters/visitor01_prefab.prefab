@@ -37,7 +37,9 @@
 		"ID": "857ffddd47490977ab1407aad7e07175",
 		"TypeName": "Game.VisitorBehavior",
 		"ParentID": "50272f234965bfef5507cc873eee2c72",
-		"V": {}
+		"V": {
+	"WalkingSpeed": 120.0
+}
 	}
 ]
 }

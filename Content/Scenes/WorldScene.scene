@@ -100,7 +100,8 @@
 			"ShadowsDistance": 10000.0,
 			"ShadowsFadeDistance": 1000.0,
 			"ShadowsStrength": 0.6000000238418579,
-			"ShadowsDepthBias": 0.0020000000949949028
+			"ShadowsDepthBias": 0.0020000000949949028,
+			"CascadeCount": 3
 		},
 		{
 			"ID": "5ee5628d425378acacb2dc8efe78aa33",

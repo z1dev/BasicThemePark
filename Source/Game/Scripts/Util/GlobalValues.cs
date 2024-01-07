@@ -5,21 +5,13 @@ using FlaxEngine;
 namespace Game;
 
 
-public static class TileGlobals
-{
-    public static float TileDimension;
-}
-
 // Filled by the TileMap object
 public static class MapGlobals
 {
-    public static int[] EntryTiles = [];
-    public static MapNavigation mapNavigation = null;
-}
-
-public static class VisitorGlobals
-{
-    public static float VisitorWalkingSpeed;
+    public static float TileDimension;
+    public static int[] EntryTiles;
+    public static int EntryGridDistance;
+    public static MapNavigation mapNavigation;
 }
 
 
@@ -52,9 +44,8 @@ public class GlobalValues : Script
 
     public override void OnAwake()
     {
-        TileGlobals.TileDimension = TileDimension;
+        MapGlobals.TileDimension = TileDimension;
         MapGlobals.mapNavigation = mapNavigation;
-        VisitorGlobals.VisitorWalkingSpeed = VisitorWalkingSpeed;
         Debug.Log(mapNavigation);
     }
 

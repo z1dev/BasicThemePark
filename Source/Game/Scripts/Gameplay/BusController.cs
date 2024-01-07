@@ -55,10 +55,11 @@ public class BusController : Script
             stopDistance = moveSpeed * stopTime * 0.5f;
         }
         
-        foreach (var pos in MapGlobals.EntryTiles)
-        {
-            stopXPosition = Math.Max(stopXPosition, pos * TileGlobals.TileDimension );
-        }
+        stopXPosition = MapGlobals.EntryTiles[^1] * MapGlobals.TileDimension;
+        // foreach (var pos in MapGlobals.EntryTiles)
+        // {
+        //     stopXPosition = Math.Max(stopXPosition, pos * MapGlobals.TileDimension );
+        // }
     }
     
     /// <inheritdoc/>
@@ -149,15 +150,15 @@ public class BusController : Script
         if (timeTillNextSpawn > 0)
             return;
         visitorCount--;
-        timeTillNextSpawn += 0.5f;
+        timeTillNextSpawn += 0.1f;
 
         var visitorActor = PrefabManager.SpawnPrefab(visitorPrefab, null);
         visitorActor = visitorActor.FindActor<AnimatedModel>("visitor") ?? visitorActor;
-        var pos = busActor.Position;
-        pos.Z += TileGlobals.TileDimension;
-        pos.Y = 0.0f;
-        pos.X += doorOffset;
-        visitorActor.Position = pos;
+        //var pos = busActor.Position;
+        //pos.Z += MapGlobals.TileDimension * 0.5f;
+        //pos.Y = 0.0f;
+        //pos.X += doorOffset;
+        //visitorActor.Position = pos;
         visitorActor.SetParent(Actor, false);
     }
 

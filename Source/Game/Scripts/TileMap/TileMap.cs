@@ -47,6 +47,7 @@ public class TileMap : Script
     // Grid X coordinates at the bottom of the map where the park can connect
     // to the outside world.
     public int[] EntryTiles = [];
+    public static int EntryGridDistance = 6;
 
     // Material to assign to created tiles
     public MaterialBase TileMaterial;
@@ -102,7 +103,7 @@ public class TileMap : Script
     /// <inheritdoc/>
     public override void OnStart()
     {
-        TileDim = TileGlobals.TileDimension;
+        TileDim = MapGlobals.TileDimension;
         tilePlacementMaterial = TileMaterial.CreateVirtualInstance();
         tilePlacementMaterial.SetParameterValue("EmissiveColor", placementColor);
 
@@ -115,6 +116,8 @@ public class TileMap : Script
 
 
         MapGlobals.EntryTiles = new int[EntryTiles.Length];
+        MapGlobals.EntryGridDistance = EntryGridDistance;
+        Array.Sort(EntryTiles);
         EntryTiles.CopyTo(MapGlobals.EntryTiles, 0);
 
         GenerateMap();
