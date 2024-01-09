@@ -5,10 +5,21 @@ using FlaxEngine;
 
 namespace Game;
 
-using FloorGroup = TileGenerator.FloorGroup;
-using FloorType = TileGenerator.FloorType;
-using FloorData = (TileGenerator.FloorGroup group, TileGenerator.FloorType ftype);
-using TileSide = TileGenerator.TileSide;
+//using FloorGroup = TileGenerator.FloorGroup;
+//using FloorType = TileGenerator.FloorType;
+//using FloorData = (TileGenerator.FloorGroup group, TileGenerator.FloorType ftype);
+//using TileSide = TileGenerator.TileSide;
+
+
+public partial struct GroupFloor
+{
+    public GroupFloor(FloorGroup g, FloorType t)
+    {
+        group = g;
+        floor = t;
+    }
+}
+
 
 /// <summary>
 /// TileMap Script.
@@ -41,7 +52,9 @@ public class TileMap : Script
     }
 
     public TileGenerator tileGenerator;
-    public MapNavigation mapNavigation;
+
+    //public MapNavigation MapNavigation;
+
     // Grid size of the starting map
     public Int2 MapSize = new(16, 16);
     // Grid X coordinates at the bottom of the map where the park can connect
@@ -70,7 +83,7 @@ public class TileMap : Script
     private float TileDim = 0.0f;
 
     // Group and floor type pairing for each map cell position.
-    private FloorData[] mapData;
+    private GroupFloor[] mapData;
     // ID of meshes placed at each map cell position.
     private StaticModel[] mapMeshes;
 
@@ -122,7 +135,7 @@ public class TileMap : Script
 
         GenerateMap();
 
-        mapNavigation.SetMapData(MapSize);
+        MapGlobals.MapNavigation.SetMapData(MapSize);
     }
     
     /// <inheritdoc/>
@@ -166,16 +179,16 @@ public class TileMap : Script
         return mapData[TileIndex(pos_x, pos_y)].group;
     }
 
-    public (FloorGroup group, FloorType ftype) TileAt(Int2 tilePos)
+    public GroupFloor TileAt(Int2 tilePos)
     {
         return TileAt(tilePos.X, tilePos.Y);
     }
 
-    public (FloorGroup group, FloorType ftype) TileAt(int pos_x, int pos_y)
+    public GroupFloor TileAt(int pos_x, int pos_y)
     {
         var index = TileIndex(pos_x, pos_y);
         if (index < 0)
-            return (FloorGroup.None, FloorType.FullTile);
+            return new GroupFloor(FloorGroup.None, FloorType.FullTile);
 
         return mapData[TileIndex(pos_x, pos_y)];
     }
@@ -347,7 +360,7 @@ public class TileMap : Script
             }
         }
 
-        mapNavigation.BeginChange();
+        MapGlobals.MapNavigation.BeginChange();
         // Second pass, replace marked ground tiles with grass.
         for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
         {
@@ -359,10 +372,10 @@ public class TileMap : Script
             if (tempMap[ix] == 2)
             {
                 SetTile(pos, FloorGroup.Grass, FloorType.FullTile);
-                mapNavigation.RemovePath(pos);
+                MapGlobals.MapNavigation.RemovePath(pos);
             }
         }
-        mapNavigation.EndChange();
+        MapGlobals.MapNavigation.EndChange();
 
         // Third pass, update surrounding tiles
         for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
@@ -376,7 +389,9 @@ public class TileMap : Script
             if (tempMap[ix] == 1 && group != FloorGroup.Grass)
             {
                 FloorType ftype = FloorTypeForSides(TileSidesForPosition(pos, group));
-                if (TileAt(pos) != (group, ftype))
+
+                var tileAtPos = TileAt(pos);
+                if ((tileAtPos.group, tileAtPos.floor) != (group, ftype))
                     SetTile(pos, group, ftype);
             }
         }
@@ -482,7 +497,7 @@ public class TileMap : Script
         int tilesPlaced = 0; 
 
         if (!temp)
-            mapNavigation.BeginChange();
+            MapGlobals.MapNavigation.BeginChange();
         for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
         {
             Int2 tempPos = TempPosFromIndex(ix);
@@ -496,10 +511,11 @@ public class TileMap : Script
                 {
                     ++tilesPlaced;
                     if (!temp)
-                        mapNavigation.AddPath(pos);
+                        MapGlobals.MapNavigation.AddPath(pos);
                 }
                 FloorType ftype = FloorTypeForSides(TileSidesForPosition(pos, group) | TempTileSidesForPosition(tempPos));
-                if (TileAt(pos) != (group, ftype))
+                var tileAtPos = TileAt(pos);
+                if ((tileAtPos.group, tileAtPos.floor) != (group, ftype))
                 {
                     if (temp)
                         CreateTemporaryTile(pos, group, ftype, tempMap[ix] == 2);
@@ -509,7 +525,7 @@ public class TileMap : Script
             }
         }
         if (!temp)
-            mapNavigation.EndChange();
+            MapGlobals.MapNavigation.EndChange();
 
         DestroyTemporaryMap();
         return tilesPlaced;
@@ -616,7 +632,7 @@ public class TileMap : Script
     {
         var grassTile = tileGenerator.GetModel(FloorGroup.Grass, FloorType.FullTile);
 
-        mapData = new FloorData[MapSize.X * MapSize.Y];
+        mapData = new GroupFloor[MapSize.X * MapSize.Y];
         //mapMeshIds = new Guid[MapSize.X * MapSize.Y];
         mapMeshes = new StaticModel[MapSize.X * MapSize.Y];
 
@@ -625,7 +641,7 @@ public class TileMap : Script
         for (int ix = 0, siz = MapSize.X * MapSize.Y; ix < siz; ++ix)
         {
             var tile = CreateTile(new Vector3(ix % MapSize.X * TileDim, 0.0, ix / MapSize.X * TileDim), grassTile);
-            mapData[ix] = (FloorGroup.Grass, FloorType.FullTile);
+            mapData[ix] = new GroupFloor(FloorGroup.Grass, FloorType.FullTile);
             //mapMeshIds[ix] = tile.ID;
             mapMeshes[ix] = tile;
         }
@@ -634,17 +650,17 @@ public class TileMap : Script
         const int extraHeight = 4;
         const int skipHeight = 5;
         const int endingHeight = 3;
-        (FloorGroup, FloorType)[] groundData = new (FloorGroup, FloorType)[MapSize.X * (extraHeight + skipHeight + endingHeight)];
+        GroupFloor[] groundData = new GroupFloor[MapSize.X * (extraHeight + skipHeight + endingHeight)];
 
         for (int ix = 0, siz = MapSize.X * endingHeight; ix < siz; ++ix)
-            groundData[ix] = (FloorGroup.Grass, FloorType.FullTile);
+            groundData[ix] = new GroupFloor(FloorGroup.Grass, FloorType.FullTile);
 
         for (int ix = MapSize.X * (endingHeight + skipHeight), siz = MapSize.X * (endingHeight + skipHeight + extraHeight); ix < siz; ++ix)
-            groundData[ix] = (FloorGroup.Grass, FloorType.FullTile);
+            groundData[ix] = new GroupFloor(FloorGroup.Grass, FloorType.FullTile);
         foreach (int posX in EntryTiles)
         {
             for (int ix = endingHeight + skipHeight, siz = endingHeight + skipHeight + extraHeight; ix < siz; ++ix)
-                groundData[MapSize.X * ix + posX] = (FloorGroup.WalkwayOnGrass, FloorTypeForSides(TileSide.Top | TileSide.Bottom));
+                groundData[MapSize.X * ix + posX] = new GroupFloor(FloorGroup.WalkwayOnGrass, FloorTypeForSides(TileSide.Top | TileSide.Bottom));
         }
         var model = tileGenerator.CreateModel(groundData, MapSize.X, extraHeight + skipHeight + endingHeight);
         
@@ -826,12 +842,18 @@ public class TileMap : Script
 
     private void CreateTemporaryTile(int pos_x, int pos_y, FloorGroup group, FloorType ftype, bool placement = false)
     {
-        tempTiles.Add(CreateTile(new Vector3(pos_x * TileDim, 0.1, pos_y * TileDim), group, ftype, placement));
+        var tile = CreateTile(new Vector3(pos_x * TileDim, 0.1, pos_y * TileDim), group, ftype, placement);
+        if (tile != null)
+            tempTiles.Add(tile);
+        else
+            Debug.Log("No tile?");
     }
 
     private StaticModel CreateTile(Vector3 world_pos, FloorGroup group, FloorType ftype, bool placement = false)
     {
-        return CreateTile(world_pos, tileGenerator.GetModel(group, ftype), placement);
+        if (tileGenerator != null)
+            return CreateTile(world_pos, tileGenerator.GetModel(group, ftype), placement);
+        return null;
     }
 
     private StaticModel CreateTile(Vector3 world_pos, Model model, bool placement = false)
@@ -851,9 +873,14 @@ public class TileMap : Script
     private void SetTile(int pos_x, int pos_y, FloorGroup group, FloorType ftype)
     {
         var tile = CreateTile(new Vector3(pos_x * TileDim, 0.0, pos_y * TileDim), group, ftype, false);
+        if (tile == null)
+        {
+            Debug.Log("No tile to set?");
+            return;
+        }
         var index = TileIndex(pos_x, pos_y);
         Destroy(ref mapMeshes[index]);
-        mapData[index] = (group, ftype);
+        mapData[index] = new GroupFloor(group, ftype);
         mapMeshes[index] = tile;
     }
 

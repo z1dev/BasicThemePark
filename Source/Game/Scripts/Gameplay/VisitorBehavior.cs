@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Net.WebSockets;
 using FlaxEngine;
 
 namespace Game;
@@ -450,7 +449,7 @@ public class VisitorBehavior : Script
         }
         else
         {
-            destTile = MapGlobals.mapNavigation.PickTile(currentTile, destDir == MapDir.PlusY ? MapNavigation.Direction.Up :
+            destTile = MapGlobals.MapNavigation.PickTile(currentTile, destDir == MapDir.PlusY ? MapNavigation.Direction.Up :
                     (destDir == MapDir.MinusY ? MapNavigation.Direction.Down :
                     (destDir == MapDir.PlusX ? MapNavigation.Direction.Right : MapNavigation.Direction.Left)));
         }

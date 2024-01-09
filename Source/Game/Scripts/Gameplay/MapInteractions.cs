@@ -3,7 +3,7 @@ using FlaxEngine;
 
 namespace Game;
 
-using FloorGroup = TileGenerator.FloorGroup;
+//using FloorGroup = TileGenerator.FloorGroup;
 
 using Vector3 = FlaxEngine.Vector3;
 using Quaternion = FlaxEngine.Quaternion;

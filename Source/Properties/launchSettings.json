@@ -2,9 +2,9 @@
   "profiles": {
     "Game": {
       "commandName": "Executable",
-      "workingDirectory": "g:/projects/Flax/BasicThemePark",
-      "executablePath": "g:/projects/Flax/Github/FlaxEngine/Binaries/Editor/Win64/Development/FlaxEditor.exe",
-      "commandLineArgs": "-project \"g:/projects/Flax/BasicThemePark\"",
+      "workingDirectory": "G:/Projects/Flax/BasicThemePark",
+      "executablePath": "G:/Flax/Flax_master/Binaries/Editor/Win64/Development/FlaxEditor.exe",
+      "commandLineArgs": "-project \"G:/Projects/Flax/BasicThemePark\"",
       "nativeDebugging": false
     }
   }

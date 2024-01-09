@@ -18,27 +18,18 @@
 			}
 		},
 		{
-			"ID": "03e89e53448d945ab728fcb2f69c5286",
+			"ID": "c8b908f3405b0080b7a507804fa590df",
+			"TypeName": "Game.ScriptGlobals",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"MapNavigation": "b036027d48123a9ad5c0cabb4c474e79"
+		},
+		{
+			"ID": "940057b34a49fb73ec6927a098a248d5",
 			"TypeName": "Game.GlobalValues",
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
 			"V": {
-	"VisitorWalkingSpeed": 120.0,
-	"mapNavigation": "b036027d48123a9ad5c0cabb4c474e79"
-}
-		},
-		{
-			"ID": "e93aabe14066cf07f69771ba814d3ceb",
-			"TypeName": "Game.TileGenerator",
-			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
-			"V": {
-	"TextureSize": {
-		"X": 256,
-		"Y": 128
-	},
-	"TileSize": {
-		"X": 64,
-		"Y": 64
-	}
+	"VisitorWalkingSpeed": 140.0,
+	"scriptGlobals": "c8b908f3405b0080b7a507804fa590df"
 }
 		},
 		{
@@ -171,12 +162,24 @@
 			"Name": "Map"
 		},
 		{
+			"ID": "c1ee2f48414bf77fccfe07a1044ec6dc",
+			"TypeName": "Game.TileGenerator",
+			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
+			"texture_size": {
+				"X": 256,
+				"Y": 128
+			},
+			"tile_size": {
+				"X": 64,
+				"Y": 64
+			}
+		},
+		{
 			"ID": "f08465ce4d2b89c1c5f79b896d48f0cb",
 			"TypeName": "Game.TileMap",
 			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
 			"V": {
-	"tileGenerator": "e93aabe14066cf07f69771ba814d3ceb",
-	"mapNavigation": "b036027d48123a9ad5c0cabb4c474e79",
+	"tileGenerator": "c1ee2f48414bf77fccfe07a1044ec6dc",
 	"MapSize": {
 		"X": 35,
 		"Y": 24
