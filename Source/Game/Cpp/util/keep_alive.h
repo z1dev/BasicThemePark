@@ -53,6 +53,11 @@ public:
 
 	KeepAlive<T>& operator=(const KeepAlive &other) = delete;
 
+	KeepAlive<T>& operator=(nullptr_t)
+	{
+		RemoveReference();
+	}
+
 	template<typename U>
 	KeepAlive<T>& operator=(KeepAlive<U> &&other)
 	{
@@ -71,6 +76,11 @@ public:
 		obj = what;
 		AddReference();
 		return *this;
+	}
+
+	operator bool() const
+	{
+		return obj != nullptr;
 	}
 
 private:
@@ -137,7 +147,7 @@ public:
 		RemoveReference();
 	}
 
-	void swap(KeepAlive &other)
+	void swap(ShareAlive &other)
 	{
 		std::swap(obj, other.obj);
 	}
@@ -175,6 +185,17 @@ public:
 		AddReference();
 		return *this;
 	}
+
+	ShareAlive<T>& operator=(nullptr_t)
+	{
+		RemoveReference();
+	}
+
+	operator bool() const
+	{
+		return obj != nullptr;
+	}
+
 private:
 	void AddReference()
 	{

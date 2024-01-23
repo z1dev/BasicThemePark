@@ -16,7 +16,7 @@ public class MapInteractions : Script
 {
 
     public Camera camera = null;
-    public TileMap tileMap = null;
+    public TileMap tileMap = MapGlobals.TileMap;
 
     public MaterialBase selectionDecalMaterial = null;
 
@@ -271,7 +271,9 @@ public class MapInteractions : Script
                 {
                     interaction = Interaction.None;
                     Int2 tilePos = MouseTile();
+                    Profiler.BeginEvent("PlaceTileSpan");
                     tileMap.PlaceTileSpan(activeCoords, tilePos, FloorGroup.WalkwayOnGrass, placeTilesFlipped);
+                    Profiler.EndEvent();
                     needsTileUpdate = true;
                     activeCoords.Y = -1;
                 }

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using FlaxEngine;
+﻿using FlaxEngine;
 
 namespace Game;
 
@@ -12,6 +10,7 @@ public static class MapGlobals
     public static int[] EntryTiles;
     public static int EntryGridDistance;
     public static MapNavigation MapNavigation;
+    public static TileMap TileMap;
 }
 
 
@@ -24,11 +23,13 @@ public class GlobalValues : Script
     public float VisitorWalkingSpeed = 100.0f;
     //public MapNavigation mapNavigation = null;
     public ScriptGlobals scriptGlobals;
+    public TileMap TileMap;
 
     public override void OnAwake()
     {
         MapGlobals.TileDimension = scriptGlobals.TileDimension;
         MapGlobals.MapNavigation = (MapNavigation)scriptGlobals.MapNavigation;
+        MapGlobals.TileMap = TileMap;
     }
 
 }

@@ -29,7 +29,18 @@
 			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
 			"V": {
 	"VisitorWalkingSpeed": 140.0,
-	"scriptGlobals": "c8b908f3405b0080b7a507804fa590df"
+	"scriptGlobals": "c8b908f3405b0080b7a507804fa590df",
+	"TileMap": "f08465ce4d2b89c1c5f79b896d48f0cb"
+}
+		},
+		{
+			"ID": "676e99e34e4dd0538fbcd2b8bde9183a",
+			"TypeName": "Game.GlobalAssets",
+			"ParentID": "24d9e48c4235ccb37f0abaa5d1a16e12",
+			"V": {
+	"flowingBarf": "93e93e3149c538bedab8988da5166e82",
+	"flowingBarfMat": "8ddee9604e5f81964f43929ad1fdcc68",
+	"vomit": "a266148c4579d944cb5871af599f1631"
 }
 		},
 		{
@@ -90,9 +101,13 @@
 			"Brightness": 2.5,
 			"ShadowsDistance": 10000.0,
 			"ShadowsFadeDistance": 1000.0,
+			"ShadowsSharpness": 2.0,
 			"ShadowsStrength": 0.6000000238418579,
 			"ShadowsDepthBias": 0.0020000000949949028,
-			"CascadeCount": 3
+			"CascadeCount": 2,
+			"Cascade1Spacing": 0.009999999776482582,
+			"Cascade2Spacing": 0.20000000298023225,
+			"PartitionMode": 2
 		},
 		{
 			"ID": "5ee5628d425378acacb2dc8efe78aa33",
@@ -261,8 +276,7 @@
 		{
 			"ID": "b036027d48123a9ad5c0cabb4c474e79",
 			"TypeName": "Game.MapNavigation",
-			"ParentID": "d4b11dd14e331b2785721abd090a9e5d",
-			"V": {}
+			"ParentID": "d4b11dd14e331b2785721abd090a9e5d"
 		}
 	]
 }

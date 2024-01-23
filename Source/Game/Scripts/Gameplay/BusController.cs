@@ -37,6 +37,7 @@ public class BusController : Script
 
     private int visitorCount = 1000;
 
+    //private AnimGraphParameter wheeloffset;
 
     /// <inheritdoc/>
     public override void OnStart()
@@ -47,7 +48,10 @@ public class BusController : Script
             timeTillNextSpawn = Mathf.Max(0.0f, spawnInterval);
             busActor = busActor.FindActor<AnimatedModel>("bus");
             if (busActor != null)
+            {
                 (busActor as AnimatedModel).SetParameterValue("WheelMultiplier", wheelSpeedMultiplier);
+                //wheeloffset = (busActor as AnimatedModel).GetParameter("WheelOffset");
+            }
             stopTime = moveSpeed / acceleration;
             stopDistance = moveSpeed * stopTime * 0.5f;
         }
@@ -76,8 +80,12 @@ public class BusController : Script
     {
         if (busActor == null)
             return;
-        
+
         var delta = Time.DeltaTime;
+
+        //wheeloffset.Value = new Vector3(0.0, 0.0, Mathf.Cos(Time.GameTime * 0.5f) * 2.0);
+        //Debug.Log(wheeloffset.Value);
+
         if (!busSpawned)
         {
             timeTillNextSpawn -= delta;

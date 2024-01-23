@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using FlaxEngine;
 
 namespace Game;
@@ -19,18 +20,21 @@ public class VisitorBehavior : Script
 
     private float TileDim = 0.0f;
 
+    private enum State
+    {
+        ParkEntry,
+        Barfing,
+        Walking
+    }
+
+    // Walkint Start
+
     private enum MapDir
     {
         PlusY,
         MinusY,
         PlusX,
         MinusX
-    }
-
-    private enum State
-    {
-        ParkEntry,
-        Walking
     }
 
     private enum LineSide
@@ -84,7 +88,29 @@ public class VisitorBehavior : Script
     // How much left to walk to reach the destination
     private float walkDistance;
 
+    // Walking end
+
+    // Vomit start
+    
+    private float barfTimer;
+    [HideInEditor]
+    public StaticModel BarfModel;
+    [HideInEditor]
+    public StaticModel VomitModel;
+
+    private static List<StaticModel> activeBarf = [];
+    private static List<StaticModel> inactiveBarf = [];
+
+
+    // Vomit end
+
     private int initDrawModes = 0;
+
+    public static void ResetBarf()
+    {
+        activeBarf = [];
+        inactiveBarf = [];
+    }
 
     /// <inheritdoc/>
     public override void OnStart()
@@ -123,6 +149,13 @@ public class VisitorBehavior : Script
             CalculateTurn();
         }
 
+        GenerateBarfTime();
+
+    }
+
+    private void GenerateBarfTime()
+    {
+        barfTimer = RandomUtil.Rand() * 20f + 5f;
     }
 
     private bool PositionOnLine(Vector3 pos, Vector3 linePt, Vector3 lineDir)
@@ -213,104 +246,126 @@ public class VisitorBehavior : Script
 
         var delta = Time.DeltaTime;
 
-        while (delta > 0.1e-4)
+        barfTimer -= delta;
+
+        if (barfTimer <= 0 && state != State.Barfing) {
+            state = State.Barfing;
+            (Actor as AnimatedModel).SetParameterValue("Barfing", true);
+        }
+        if (state == State.Barfing && (bool)(Actor as AnimatedModel).GetParameterValue("Barfing") == false)
         {
-            if (moveState == MoveState.ApproachFullTurn)
+            // Barfing parameter is automatically turned off when the animation finished playing but 
+            // the state will stay the same.
+
+
+            state = State.Walking;
+            GenerateBarfTime();
+        }
+
+
+        // Walking
+
+        if (state == State.ParkEntry || state == State.Walking)
+        {
+            while (delta > 0.1e-4)
             {
-                var dist = Mathf.Min(WalkingSpeed * delta, walkDistance);
-                delta = Mathf.Max(0.0f, delta - (dist / WalkingSpeed));
-                walkDistance -= dist;
-
-                Actor.Position += currentVec * dist;
-
-                if (delta > 0.1e-4)
-                    moveState = MoveState.TurningFullTurn;
-            }
-
-            if (moveState == MoveState.TurningFullTurn)
-            {
-                // How much distance over the turning arc is remaining
-                var arcSize = turnRadius * Mathf.PiOverTwo * turnArc;
-                if (arcSize > 0.1e-6 && turnArc >= 0.1e-6)
+                if (moveState == MoveState.ApproachFullTurn)
                 {
-                    var arcDist = Mathf.Min(WalkingSpeed * delta, arcSize);
+                    var dist = Mathf.Min(WalkingSpeed * delta, walkDistance);
+                    delta = Mathf.Max(0.0f, delta - (dist / WalkingSpeed));
+                    walkDistance -= dist;
 
-                    delta = Mathf.Max(0.0f, delta - (arcDist / WalkingSpeed));
+                    Actor.Position += currentVec * dist;
 
-                    arcDist = arcDist / arcSize * turnArc;
-
-                    Actor.Position = turnCenter + RotateVector(Actor.Position - turnCenter, Mathf.PiOverTwo * arcDist, turnSide);
-
-                    turnArc -= arcDist;
-
-                    currentVec = RotateVector(currentVec, Mathf.PiOverTwo * arcDist, turnSide);
-                    Actor.Orientation = Quaternion.FromDirection(currentVec * -1.0f);
+                    if (delta > 0.1e-4)
+                        moveState = MoveState.TurningFullTurn;
                 }
-                if (delta > 0.1e-4)
+
+                if (moveState == MoveState.TurningFullTurn)
                 {
-                    currentDir = currentDir == MapDir.PlusY ? MapDir.MinusX :
-                            currentDir == MapDir.MinusX ? MapDir.MinusY :
-                            currentDir == MapDir.MinusY ? MapDir.PlusX :
-                            MapDir.PlusY;
-                    currentVec = GetWalkVector(currentDir);
-                    CalculateTurn();
+                    // How much distance over the turning arc is remaining
+                    var arcSize = turnRadius * Mathf.PiOverTwo * turnArc;
+                    if (arcSize > 0.1e-6 && turnArc >= 0.1e-6)
+                    {
+                        var arcDist = Mathf.Min(WalkingSpeed * delta, arcSize);
+
+                        delta = Mathf.Max(0.0f, delta - (arcDist / WalkingSpeed));
+
+                        arcDist = arcDist / arcSize * turnArc;
+
+                        Actor.Position = turnCenter + RotateVector(Actor.Position - turnCenter, Mathf.PiOverTwo * arcDist, turnSide);
+
+                        turnArc -= arcDist;
+
+                        currentVec = RotateVector(currentVec, Mathf.PiOverTwo * arcDist, turnSide);
+                        Actor.Orientation = Quaternion.FromDirection(currentVec * -1.0f);
+                    }
+                    if (delta > 0.1e-4)
+                    {
+                        currentDir = currentDir == MapDir.PlusY ? MapDir.MinusX :
+                                currentDir == MapDir.MinusX ? MapDir.MinusY :
+                                currentDir == MapDir.MinusY ? MapDir.PlusX :
+                                MapDir.PlusY;
+                        currentVec = GetWalkVector(currentDir);
+                        CalculateTurn();
+                    }
                 }
-            }
 
-            if (moveState == MoveState.ApproachTurn)
-            {
-                var dist = Mathf.Min(WalkingSpeed * delta, turnDistance);
-                delta = Mathf.Max(0.0f, delta - (dist / WalkingSpeed));
-                turnDistance -= dist;
-
-                Actor.Position += currentVec * dist;
-
-                if (delta > 0.1e-4)
-                    moveState = MoveState.Turning;
-            }
-
-            if (moveState == MoveState.Turning)
-            {
-                // How much distance over the turning arc is remaining
-                var arcSize = turnRadius * Mathf.PiOverTwo * turnArc;
-                if (arcSize > 0.1e-6 && turnArc >= 0.1e-6)
+                if (moveState == MoveState.ApproachTurn)
                 {
-                    var arcDist = Mathf.Min(WalkingSpeed * delta, arcSize);
+                    var dist = Mathf.Min(WalkingSpeed * delta, turnDistance);
+                    delta = Mathf.Max(0.0f, delta - (dist / WalkingSpeed));
+                    turnDistance -= dist;
 
-                    delta = Mathf.Max(0.0f, delta - (arcDist / WalkingSpeed));
+                    Actor.Position += currentVec * dist;
 
-                    arcDist = arcDist / arcSize * turnArc;
-
-                    Actor.Position = turnCenter + RotateVector(Actor.Position - turnCenter, Mathf.PiOverTwo * arcDist, turnSide);
-                    turnArc -= arcDist;
-                    currentVec = RotateVector(currentVec, Mathf.PiOverTwo * arcDist, turnSide);
-
-                    Actor.Orientation = Quaternion.FromDirection(currentVec * -1.0f);
+                    if (delta > 0.1e-4)
+                        moveState = MoveState.Turning;
                 }
-                if (delta > 0.1e-4)
+
+                if (moveState == MoveState.Turning)
                 {
-                    moveState = MoveState.GoForward;
-                    currentVec = destVec;
-                    currentDir = destDir;
-                    walkDistance = destDir == MapDir.MinusX || destDir == MapDir.PlusX ? Mathf.Abs(destPos.X - Actor.Position.X) : Mathf.Abs(destPos.Z - Actor.Position.Z);
+                    // How much distance over the turning arc is remaining
+                    var arcSize = turnRadius * Mathf.PiOverTwo * turnArc;
+                    if (arcSize > 0.1e-6 && turnArc >= 0.1e-6)
+                    {
+                        var arcDist = Mathf.Min(WalkingSpeed * delta, arcSize);
+
+                        delta = Mathf.Max(0.0f, delta - (arcDist / WalkingSpeed));
+
+                        arcDist = arcDist / arcSize * turnArc;
+
+                        Actor.Position = turnCenter + RotateVector(Actor.Position - turnCenter, Mathf.PiOverTwo * arcDist, turnSide);
+                        turnArc -= arcDist;
+                        currentVec = RotateVector(currentVec, Mathf.PiOverTwo * arcDist, turnSide);
+
+                        Actor.Orientation = Quaternion.FromDirection(currentVec * -1.0f);
+                    }
+                    if (delta > 0.1e-4)
+                    {
+                        moveState = MoveState.GoForward;
+                        currentVec = destVec;
+                        currentDir = destDir;
+                        walkDistance = destDir == MapDir.MinusX || destDir == MapDir.PlusX ? Mathf.Abs(destPos.X - Actor.Position.X) : Mathf.Abs(destPos.Z - Actor.Position.Z);
+                    }
                 }
-            }
 
-            if (moveState == MoveState.GoForward)
-            {
-                var dist = Mathf.Min(WalkingSpeed * delta, walkDistance);
-                walkDistance -= dist;
-                delta = Mathf.Max(0.0f, delta - (dist / WalkingSpeed));
-
-                Actor.Position += currentVec * dist;
-
-                if (delta > 0.1e-4)
+                if (moveState == MoveState.GoForward)
                 {
-                    if (!CalculateNext())
-                        delta = 0.0f;
-                }
-            }
+                    var dist = Mathf.Min(WalkingSpeed * delta, walkDistance);
+                    walkDistance -= dist;
+                    delta = Mathf.Max(0.0f, delta - (dist / WalkingSpeed));
 
+                    Actor.Position += currentVec * dist;
+
+                    if (delta > 0.1e-4)
+                    {
+                        if (!CalculateNext())
+                            delta = 0.0f;
+                    }
+                }
+
+            }
         }
     }
 
@@ -449,9 +504,9 @@ public class VisitorBehavior : Script
         }
         else
         {
-            destTile = MapGlobals.MapNavigation.PickTile(currentTile, destDir == MapDir.PlusY ? MapNavigation.Direction.Up :
-                    (destDir == MapDir.MinusY ? MapNavigation.Direction.Down :
-                    (destDir == MapDir.PlusX ? MapNavigation.Direction.Right : MapNavigation.Direction.Left)));
+            destTile = MapGlobals.MapNavigation.PickTile(currentTile, destDir == MapDir.PlusY ? NavDir.Up :
+                    (destDir == MapDir.MinusY ? NavDir.Down :
+                    (destDir == MapDir.PlusX ? NavDir.Right : NavDir.Left)));
         }
 
         var result = destTile != currentTile;
@@ -483,5 +538,35 @@ public class VisitorBehavior : Script
         }
 
         return result;
+    }
+
+    public StaticModel GetBarfModel()
+    {
+        StaticModel model;
+        if (inactiveBarf.Count != 0)
+        {
+            model = inactiveBarf[^1];
+            activeBarf.Add(model);
+            inactiveBarf.RemoveAt(inactiveBarf.Count - 1);
+        }
+        else
+        {
+            model = Actor.Parent.AddChild<StaticModel>();
+            var material = AssetGlobals.FlowingBarfMat.CreateVirtualInstance();
+            model.Model = AssetGlobals.FlowingBarf;
+            model.SetMaterial(0, material);
+            activeBarf.Add(model);
+        }
+        return model;
+    }
+
+    public void HideBarfModel()
+    {
+        var model = BarfModel;
+        BarfModel = null;
+        model.IsActive = false;
+        activeBarf.Remove(model);
+        inactiveBarf.Add(model);
+
     }
 }

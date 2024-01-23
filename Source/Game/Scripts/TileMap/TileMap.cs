@@ -84,14 +84,17 @@ public class TileMap : Script
 
     // Group and floor type pairing for each map cell position.
     private GroupFloor[] mapData;
-    // ID of meshes placed at each map cell position.
-    private StaticModel[] mapMeshes;
+    // Modelss placed at each map cell position.
+    private StaticModel[] mapTiles;
 
     private ItemMapData[] itemMap;
 
     private (Int2 A, Int2 B) tempPosition;
     private FloorGroup tempGroup;
     private List<StaticModel> tempTiles = [];
+    // Holds models that were added as temporary tiles and then set to inactive. Used as a pool that keeps them on
+    // the scene, as adding actors is slow.
+    private List<StaticModel> tilePool = [];
 
     private Int2 tempMapOrigin;
     private Int2 tempMapSize;
@@ -113,9 +116,12 @@ public class TileMap : Script
     // Reverse of selectionMaterials.
     private Dictionary<MaterialInstance, MaterialBase> deselectionMaterials;
 
+
     /// <inheritdoc/>
     public override void OnStart()
     {
+        VisitorBehavior.ResetBarf();
+
         TileDim = MapGlobals.TileDimension;
         tilePlacementMaterial = TileMaterial.CreateVirtualInstance();
         tilePlacementMaterial.SetParameterValue("EmissiveColor", placementColor);
@@ -318,7 +324,7 @@ public class TileMap : Script
                 if (itemMap[index].mtype != ItemType.None)
                     newSelection.Add(itemMap[index].actor);
                 else
-                    newSelection.Add(mapMeshes[index]);
+                    newSelection.Add(mapTiles[index]);
             }
         }
         UpdateSelectionModels(newSelection);
@@ -456,7 +462,7 @@ public class TileMap : Script
     // Returns the number of tiles placed, or that would be placed with the given positions.
     private int InnerPlaceTileSpan(Int2 posA, Int2 posB, FloorGroup group, bool flipped, bool temp, bool forceUpdate)
     {
-         if (temp)
+        if (temp)
         {
             if (!forceUpdate && tempPosition == (posA, posB) && tempGroup == group)
                 return 1;
@@ -465,7 +471,9 @@ public class TileMap : Script
             tempGroup = group;
         }
 
+        Profiler.BeginEvent("HideTemporaryModels");
         HideTemporaryModels();
+        Profiler.EndEvent();
 
         (int indexA, int indexB) = (TileIndex(posA), TileIndex(posB));
         bool invalidIndex = indexA < 0 || indexB < 0;
@@ -473,8 +481,11 @@ public class TileMap : Script
         if (invalidIndex || mapData[indexA].group == group || itemMap[indexA].mtype != ItemType.None)
             return 0;
 
+        Profiler.BeginEvent("CreateTemporaryMap");
         CreateTemporaryMap(posA, posB);
-        
+        Profiler.EndEvent();
+
+        Profiler.BeginEvent("PlotTemp");
         if ((Mathf.Abs(posA.X - posB.X) >= Mathf.Abs(posB.Y - posA.Y )) ^ flipped)
         {
             for (int dif = posA.X < posB.X ? 1 : -1, x = posA.X, end = posB.X + dif; x != end; x += dif)
@@ -493,11 +504,13 @@ public class TileMap : Script
                 if (TileGroupAt(x, posB.Y) != group && ItemTypeAt(x, posB.Y) == ItemType.None)
                     PlotOnTemporaryMap(x, posB.Y);
         }
+        Profiler.EndEvent();
 
         int tilesPlaced = 0; 
 
         if (!temp)
             MapGlobals.MapNavigation.BeginChange();
+        Profiler.BeginEvent("CreateTemporaryTiles");
         for (int ix = 0, siz = TempMapCount(); ix < siz; ++ix)
         {
             Int2 tempPos = TempPosFromIndex(ix);
@@ -517,17 +530,25 @@ public class TileMap : Script
                 var tileAtPos = TileAt(pos);
                 if ((tileAtPos.group, tileAtPos.floor) != (group, ftype))
                 {
+                    Profiler.BeginEvent("CreateTemporaries");
                     if (temp)
                         CreateTemporaryTile(pos, group, ftype, tempMap[ix] == 2);
                     else
                         SetTile(pos, group, ftype);
+                    Profiler.EndEvent();
                 }
             }
         }
+        Profiler.EndEvent();
+
+        Profiler.BeginEvent("EndNavigation");
         if (!temp)
             MapGlobals.MapNavigation.EndChange();
+        Profiler.EndEvent();
 
+        Profiler.BeginEvent("DestroyTemporaryMap");
         DestroyTemporaryMap();
+        Profiler.EndEvent();
         return tilesPlaced;
     }
 
@@ -617,7 +638,8 @@ public class TileMap : Script
 
     public void HideTemporaryModels()
     {
-        tempTiles.ForEach(sm => Destroy(sm));
+        tempTiles.ForEach(sm => sm.IsActive = false);
+        tilePool.AddRange(tempTiles);
         tempTiles = [];
 
         tempItemType = ItemType.None;
@@ -634,16 +656,17 @@ public class TileMap : Script
 
         mapData = new GroupFloor[MapSize.X * MapSize.Y];
         //mapMeshIds = new Guid[MapSize.X * MapSize.Y];
-        mapMeshes = new StaticModel[MapSize.X * MapSize.Y];
+        mapTiles = new StaticModel[MapSize.X * MapSize.Y];
 
         itemMap = new ItemMapData[MapSize.X * MapSize.Y];
 
         for (int ix = 0, siz = MapSize.X * MapSize.Y; ix < siz; ++ix)
         {
-            var tile = CreateTile(new Vector3(ix % MapSize.X * TileDim, 0.0, ix / MapSize.X * TileDim), grassTile);
+            var tile = Actor.AddChild<StaticModel>();
+            SetTileData(new Vector3(ix % MapSize.X * TileDim, 0.0, ix / MapSize.X * TileDim), grassTile, tile, false);
             mapData[ix] = new GroupFloor(FloorGroup.Grass, FloorType.FullTile);
             //mapMeshIds[ix] = tile.ID;
-            mapMeshes[ix] = tile;
+            mapTiles[ix] = tile;
         }
 
         // Build the outer side to the park from generated tile data instead of models.
@@ -842,26 +865,32 @@ public class TileMap : Script
 
     private void CreateTemporaryTile(int pos_x, int pos_y, FloorGroup group, FloorType ftype, bool placement = false)
     {
-        var tile = CreateTile(new Vector3(pos_x * TileDim, 0.1, pos_y * TileDim), group, ftype, placement);
-        if (tile != null)
-            tempTiles.Add(tile);
+        StaticModel tile = null;
+        if (tilePool.Count() > 0)
+        {
+            tile = tilePool[^1];
+            tilePool.RemoveAt(tilePool.Count() - 1);
+        }
         else
-            Debug.Log("No tile?");
+            tile = Actor.AddChild<StaticModel>();
+
+        SetTileData(new Vector3(pos_x * TileDim, 0.1, pos_y * TileDim), group, ftype, tile, placement);
+        tempTiles.Add(tile);
     }
 
-    private StaticModel CreateTile(Vector3 world_pos, FloorGroup group, FloorType ftype, bool placement = false)
+    private StaticModel SetTileData(Vector3 world_pos, FloorGroup group, FloorType ftype, StaticModel tile, bool placement = false)
     {
         if (tileGenerator != null)
-            return CreateTile(world_pos, tileGenerator.GetModel(group, ftype), placement);
+            return SetTileData(world_pos, tileGenerator.GetModel(group, ftype), tile, placement);
         return null;
     }
 
-    private StaticModel CreateTile(Vector3 world_pos, Model model, bool placement = false)
+    private StaticModel SetTileData(Vector3 world_pos, Model model, StaticModel tile, bool placement = false)
     {
-        var tile = Actor.AddChild<StaticModel>();
         tile.Model = model;
         tile.Position = world_pos;
         tile.SetMaterial(0, placement ? tilePlacementMaterial : TileMaterial);
+        tile.IsActive = true;
         return tile;
     }
 
@@ -872,16 +901,9 @@ public class TileMap : Script
 
     private void SetTile(int pos_x, int pos_y, FloorGroup group, FloorType ftype)
     {
-        var tile = CreateTile(new Vector3(pos_x * TileDim, 0.0, pos_y * TileDim), group, ftype, false);
-        if (tile == null)
-        {
-            Debug.Log("No tile to set?");
-            return;
-        }
         var index = TileIndex(pos_x, pos_y);
-        Destroy(ref mapMeshes[index]);
+        var tile = SetTileData(new Vector3(pos_x * TileDim, 0.0, pos_y * TileDim), group, ftype, mapTiles[index], false);
         mapData[index] = new GroupFloor(group, ftype);
-        mapMeshes[index] = tile;
     }
 
     private static TileSide CombineSides(TileSide a, TileSide b)
